@@ -1,5 +1,3 @@
-# dot-achievements
-
 Achievements for Godot 4.7+, kept as data. You declare rules over per-player numbers once, and a dedicated server can check what a player has earned without loading any picture, icon or scene. Part of the [dot-*](https://github.com/modcommunity) family.
 
 It supports counters, bests, tiers, hidden and secret entries, progress that is never misreported, a pluggable store (memory, a file per player, or SQL), and a batched reporter for the TMC back end.
