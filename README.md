@@ -1,30 +1,25 @@
-This is the **achievements** asset for TMC's **Dot** collection. What a player has earned, as a document a dedicated server can check without ever loading a picture.
+# dot-achievements
 
-This collection of assets provides modular building blocks for creating games and applications within the TMC ecosystem, ensuring consistency and interoperability across all `dot-*` assets. This includes core functionality, networking, authentication, cloud integration, and more.
+Achievements for Godot 4.7+, kept as data. You declare rules over per-player numbers once, and a dedicated server can check what a player has earned without loading any picture, icon or scene. Part of the [dot-*](https://github.com/modcommunity) family.
 
-**These assets are COMPLETELY OPEN SOURCE**. You are free to use, modify, and distribute them under the terms of the MIT license. The only thing not open source is the back-end web infrastructure. So if you opt into using your own authentication backend instead of integrating with TMC, you will need to build and integrate your own back-end infrastructure.
+It supports counters, bests, tiers, hidden and secret entries, progress that is never misreported, a pluggable store (memory, a file per player, or SQL), and a batched reporter for the TMC back end.
 
-## From Maintainer & WARNING
-This asset, along with all the others, was built initially with **Claude Code** and will continue to be maintained and extended using it. This is because I (`gamemann`) cannot build the entire TMC platform alone (I wish I could lol).
+Why data? An achievement whose condition lives inside the code that awards it cannot be listed, shown as progress, or checked against a save file. As data, a server can validate the whole catalogue at boot.
 
-**Please treat this as partially tested.** Every asset has its own headless test suite and those suites pass, but very little of this has been in front of real players yet. Expect rough edges, and please report anything you run into.
+## Install
 
-I intend on reviewing code, testing, and editing documentation regularly. If you're interested in helping out, please let me know!
+1. Copy `addons/dot_achievements/` and `addons/dot_core/` (from [dot-core](https://github.com/modcommunity/dot-core)) into your project.
+2. Enable dot-achievements in *Project > Project Settings > Plugins*.
 
-## Achievements
-**Rules over per-player numbers, declared once.** Counters, bests, tiers, hidden and secret entries, progress bars that do not lie, a pluggable store (memory, a file per player, or SQL), and a batched reporter for the TMC backbone.
+Optional, and never named in the source:
 
-## Why
+| Addon | What it adds |
+| --- | --- |
+| [dot-stats](https://github.com/modcommunity/dot-stats) | The natural source of the numbers, bridged by `DotAchievementStatsLink`. |
+| [dot-auth](https://github.com/modcommunity/dot-auth) | The back-end client for reporting. |
+| [dot-sql](https://github.com/modcommunity/dot-sql) | SQLite, Postgres or MySQL/MariaDB storage. |
 
-An achievement whose condition lives inside the code that awards it is one nobody can list, show progress towards, or check a save file against. Stating it as data instead means a server can validate the whole catalogue at boot, decide what somebody has earned, and report it, **without loading a mesh, an icon or a scene**. That is the same reason dot-loadout and dot-user-avatar are documents rather than objects.
-
-## Installing
-
-Copy `addons/dot_achievements/` and [`dot-core`](https://github.com/modcommunity/dot-core)'s `addons/dot_core/` into your project and enable dot-achievements in *Project → Project Settings → Plugins*.
-
-[dot-stats](https://github.com/modcommunity/dot-stats) is optional and is the natural source of the numbers; `DotAchievementStatsLink` bridges to it without naming it. [dot-auth](https://github.com/modcommunity/dot-auth) supplies the backbone client and is likewise not named anywhere in the source. Requires Godot 4.7 or newer.
-
-## Five minutes
+## Quick start
 
 ```gdscript
 var catalogue := DotAchievementCatalogue.of([
@@ -48,7 +43,23 @@ tracker.record(player_key, &"kills", 1)
 await tracker.end(player_key)           # saves
 ```
 
-`record()` merges by the kind the rule declared, so a counter adds and a best keeps the better. One call serves every stat, and a game cannot get it the wrong way round.
+`record()` merges by the kind the rule declared: a counter adds, a best keeps the better value.
+
+## Stores
+
+| Store | Use it for |
+| --- | --- |
+| `DotAchievementStoreMemory` | Tests and throwaway sessions. |
+| `DotAchievementStoreFile` | One file per player on disk. |
+| `DotAchievementStoreSql` | Servers that share progress. Needs a dot-sql driver. |
+
+```gdscript
+var store := DotAchievementStoreSql.new(driver)   # any dot-sql driver
+await store.open()                                # creates or migrates its two tables
+tracker.store = store
+```
+
+The SQL store keeps one row per held number and one row per unlock (`dot_achievement_values` and `dot_achievement_unlocks`; both table names are configurable). That makes "how many players earned this" a query. Saves are batched and serialised per player.
 
 ## With dot-stats
 
@@ -59,53 +70,48 @@ link.stats = stats_tracker
 add_child(link)
 ```
 
-dot-stats' `recorded` signal carries a player's **session** total, and an achievement is about a lifetime. Wiring the signal straight into `record()` adds the running session total on every kill: three after the second, six after the third, ten after the fourth. The link holds a baseline and files the difference, and treats a total that goes down as a new session rather than as a negative delta.
+dot-stats reports a session total, but an achievement is about a lifetime. The link remembers a baseline and files only the difference, and treats a total that goes down as a new session.
 
-## In a database
-
-```gdscript
-var store := DotAchievementStoreSql.new(driver)   # any dot-sql driver
-await store.open()                                # creates or migrates its two tables
-tracker.store = store
-```
-
-For servers that share progress: SQLite, Postgres or MySQL/MariaDB through [dot-sql](https://github.com/modcommunity/dot-sql), reached duck-typed so dot-achievements parses without it. A row per held number and a row per unlock (`dot_achievement_values`, `dot_achievement_unlocks`, both names configurable) rather than one JSON blob per player, so "how many have earned this" is a query and not a scan. A save writes the whole progress as one batch, never rewrites when something was earned, and two saves of one player are run one after the other so the older can never land last.
-
-## Showing them
+## Showing achievements
 
 ```gdscript
 for row in tracker.listing(player_key):
     print(row["name"], row.get("progress", row.get("unlocked")))
 ```
 
-Hidden entries are absent until earned, and secret ones arrive without their description. The filtering happens here rather than in a UI, because a description withheld by the interface that drew it was still sent to the client.
+Hidden entries are left out until earned. Secret ones are listed without their description. The filtering happens in the tracker, so a withheld description is never sent to the client.
 
-## The achievement catalogue file
+## Site catalogue file
 
-A game's catalogue can be written as the site's `dot-achievement-defs` JSON, so the site owner imports it from the dashboard (or a deploy posts it) instead of waiting for a server to boot and declare it. Run it from the game project with the static method that returns the game's `DotAchievementCatalogue`; `tools/export_site_defs.gd` takes `--source`, `--method`, `--out` (default `deployment/achievement-defs.json`), `--game` and `--check`.
+You can export a catalogue as the site's `dot-achievement-defs` JSON, so the site owner can import it from the dashboard. Run `tools/export_site_defs.gd` from your game project:
 
-`--check` writes nothing and exits 1 when the file is stale. `--game <id>` pins the site app id, left out by default so one file imports into any environment. The file is `DotAchievementCatalogue.to_site_defs()`:
+| Option | Meaning |
+| --- | --- |
+| `--source` | Script that holds the static method returning your `DotAchievementCatalogue`. |
+| `--method` | Name of that method. |
+| `--out` | Output file. Default `deployment/achievement-defs.json`. |
+| `--game` | Pin the site app id. Left out by default so one file imports into any environment. |
+| `--check` | Write nothing and exit 1 if the file is stale. |
 
-```json
-{"format": "dot-achievement-defs", "version": 1, "achievements": [
-  {"key": "k100", "name": "Centurion", "description": "", "points": 10, "category": "", "icon": "",
-   "hidden": false, "secret": false, "series": "kills", "tier": 1, "requireAll": true,
-   "rules": [{"stat": "kills", "op": "at_least", "value": 100, "merge": "sum"}]}]}
-```
+`op` in a rule is one of `at_least`, `at_most`, `equals`, `not_equals`. `merge` is one of `sum`, `latest`, `highest`, `lowest`. Importing merges by `key`: achievements the file does not mention, and all unlocks, are kept.
 
-`op` is one of `at_least`, `at_most`, `equals`, `not_equals`; `merge` one of `sum`, `latest`, `highest`, `lowest`. Importing is a merge keyed by `key`: achievements the file does not mention, and every unlock, are kept.
-
-## Validating
+## Test
 
 ```bash
 godot --headless --path . --import
 godot --headless --path . res://examples/achievements_selftest.tscn
-# Offline. Exits non-zero on any failure.
+```
 
-# the SQL store against real SQLite, Postgres and MariaDB (dot-sql linked in addons/)
+This runs offline and exits non-zero on any failure. To test the SQL store against real SQLite, Postgres and MariaDB, link dot-sql into `addons/` and run:
+
+```bash
 ../dot-sql/tools/test_live.sh . res://examples/achievements_sql_live.tscn
 ```
 
+## Status
+
+Built and maintained with Claude Code. The test suites pass, but little of this has been in front of real players yet. Please report rough edges by opening an issue.
+
 ## Licence
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). Only the TMC back-end web infrastructure is not open source; if you use your own back end, you build that part yourself.
