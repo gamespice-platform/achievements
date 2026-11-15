@@ -14,6 +14,6 @@ addons/dot_achievements/store/dot_achievement_store.gd::long_block	4
 addons/dot_achievements/store/dot_achievement_store_file.gd::long_block	1
 addons/dot_achievements/store/dot_achievement_store_memory.gd::long_block	1
 addons/dot_achievements/store/dot_achievement_store_sql.gd::long_block	1
-examples/achievements_selftest.gd::banner	6
-examples/achievements_selftest.gd::long_block	6
+examples/achievements_selftest.gd::banner	4
+examples/achievements_selftest.gd::long_block	5
 examples/achievements_sql_live.gd::long_block	1

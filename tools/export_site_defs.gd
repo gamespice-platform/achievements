@@ -1,8 +1,7 @@
 extends SceneTree
 
-## Writes a game's achievements as the site's `dot-achievement-defs` JSON. Run inside the game project:
-##   godot --headless --path . --script ../dot-achievements/tools/export_site_defs.gd -- \
-##     --source res://game/x_achievements.gd --method catalogue --out deployment/achievement-defs.json [--check] [--game 12]
+## Writes a game's achievements as the site's `dot-achievement-defs` JSON, run inside the game project: godot --headless --path . --script ../dot-achievements/tools/export_site_defs.gd --
+##   --source res://game/x_achievements.gd --method catalogue --out deployment/achievement-defs.json [--check] [--game 12]
 ## --check writes nothing and exits 1 if the file on disk differs.
 
 func _init() -> void:

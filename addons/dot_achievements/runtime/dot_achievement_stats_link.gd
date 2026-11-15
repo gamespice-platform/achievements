@@ -42,10 +42,9 @@ var stats: Object = null
 ## Registry name to find one under when [member stats] is not set.
 var stats_service: StringName = &"dot_stats_tracker"
 
-## stats key -> achievement key, for a game that files its stats under one key and its
-## records under another. A reading under a key listed here is filed under the mapped
-## key (baselines too, so [method forget] takes the achievement key); a key not listed
-## passes through. The game adds and erases entries as players begin and leave.
+## stats key -> achievement key, for a game that files stats and records under different keys. A reading
+## (and its baseline, so [method forget] takes the achievement key) under a listed key is filed under the
+## mapped key; an unlisted key passes through. The game adds and erases entries as players come and go.
 var key_map: Dictionary = {}
 
 var _last_session: Dictionary = {}
