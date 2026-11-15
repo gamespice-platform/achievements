@@ -1,4 +1,4 @@
-Achievements for Godot 4.7+, kept as data. You declare rules over per-player numbers once, and a dedicated server can check what a player has earned without loading any picture, icon or scene. Part of the [dot-*](https://github.com/modcommunity) family.
+Achievements for Godot 4.7+, kept as data. You declare rules over per-player numbers once, and a dedicated server can check what a player has earned without loading any picture, icon or scene. Part of the [dot-*](https://github.com/gamespice-platform) family.
 
 It supports counters, bests, tiers, hidden and secret entries, progress that is never misreported, a pluggable store (memory, a file per player, or SQL), and a batched reporter for the TMC back end.
 
@@ -6,16 +6,16 @@ Why data? An achievement whose condition lives inside the code that awards it ca
 
 ## Install
 
-1. Copy `addons/dot_achievements/` and `addons/dot_core/` (from [dot-core](https://github.com/modcommunity/dot-core)) into your project.
+1. Copy `addons/dot_achievements/` and `addons/dot_core/` (from [dot-core](https://github.com/gamespice-platform/core)) into your project.
 2. Enable dot-achievements in *Project > Project Settings > Plugins*.
 
 Optional, and never named in the source:
 
 | Addon | What it adds |
 | --- | --- |
-| [dot-stats](https://github.com/modcommunity/dot-stats) | The natural source of the numbers, bridged by `DotAchievementStatsLink`. |
-| [dot-auth](https://github.com/modcommunity/dot-auth) | The back-end client for reporting. |
-| [dot-sql](https://github.com/modcommunity/dot-sql) | SQLite, Postgres or MySQL/MariaDB storage. |
+| [dot-stats](https://github.com/gamespice-platform/stats) | The natural source of the numbers, bridged by `DotAchievementStatsLink`. |
+| [dot-auth](https://github.com/gamespice-platform/auth) | The back-end client for reporting. |
+| [dot-sql](https://github.com/gamespice-platform/sql) | SQLite, Postgres or MySQL/MariaDB storage. |
 
 ## Quick start
 
