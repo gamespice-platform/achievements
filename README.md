@@ -1,6 +1,6 @@
 Achievements for Godot 4.7+, kept as data. You declare rules over per-player numbers once, and a dedicated server can check what a player has earned without loading any picture, icon or scene. Part of the [dot-*](https://github.com/gamespice-platform) family.
 
-It supports counters, bests, tiers, hidden and secret entries, progress that is never misreported, a pluggable store (memory, a file per player, or SQL), and a batched reporter for the TMC back end.
+It supports counters, bests, tiers, hidden and secret entries, progress that is never misreported, a pluggable store (memory, a file per player, or SQL), a batched reporter for the TMC back end, and a signed points event reporter for Gamespice app points.
 
 Why data? An achievement whose condition lives inside the code that awards it cannot be listed, shown as progress, or checked against a save file. As data, a server can validate the whole catalogue at boot.
 
@@ -16,6 +16,7 @@ Optional, and never named in the source:
 | [dot-stats](https://github.com/gamespice-platform/stats) | The natural source of the numbers, bridged by `DotAchievementStatsLink`. |
 | [dot-auth](https://github.com/gamespice-platform/auth) | The back-end client for reporting. |
 | [dot-sql](https://github.com/gamespice-platform/sql) | SQLite, Postgres or MySQL/MariaDB storage. |
+| [dot-cloud](https://github.com/gamespice-platform/cloud) | The RSA signature `DotPointsReporter` signs its batches with. |
 
 ## Quick start
 
@@ -79,6 +80,34 @@ for row in tracker.listing(player_key):
 
 Hidden entries are left out until earned. Secret ones are listed without their description. The filtering happens in the tracker, so a withheld description is never sent to the client.
 
+## Points events
+
+A dedicated server reports what happened (a kill, a round won) and the site decides what it is worth. Nothing here sends an amount.
+
+```gdscript
+var cfg := DotPointsReporterConfig.new()
+cfg.app_id = 12
+cfg.server_id = 34
+cfg.private_key_path = "/etc/mygame/points.pem"
+var loaded := cfg.load_layered("")   # DOT_POINTS_* and --points-* override
+var points := DotPointsReporter.new()
+add_child(points)
+var configured := points.configure(cfg)   # fails loudly on a bad config or key
+points.report(player_key, "kill", 1, {"humans": 10, "vsBot": false})
+```
+
+`report()` returns the eventId. `events_settled(results)` carries the site's answer for each event, and `batch_dropped(event_ids, error)` names events the site refused as a whole batch.
+
+| Key | Meaning |
+| --- | --- |
+| `app_id`, `server_id` | Required. The app and this server on the site. |
+| `private_key_path` / `private_key_pem` | The server's RSA private key (2048 bits or more). Set one of the two. |
+| `flush_interval_secs` | Seconds between flushes. 0 = no timer; call `flush()` yourself. |
+| `max_batch_events` | Events per signed request. 0 = unlimited. |
+| `max_pending_events` | Events held while the site is unreachable. 0 = unlimited; past it `report()` fails. |
+
+The app owner registers the server's public key once: `POST /api/app/v1/apps/:id/points/keys` with `{serverId, alg: "RSA_SHA256", publicKey}` (SPKI PEM). See [docs/design.md](docs/design.md#the-points-reporter).
+
 ## Site catalogue file
 
 You can export a catalogue as the site's `dot-achievement-defs` JSON, so the site owner can import it from the dashboard. Run `tools/export_site_defs.gd` from your game project:
@@ -98,9 +127,10 @@ You can export a catalogue as the site's `dot-achievement-defs` JSON, so the sit
 ```bash
 godot --headless --path . --import
 godot --headless --path . res://examples/achievements_selftest.tscn
+godot --headless --path . res://examples/points_selftest.tscn   # needs dot-cloud linked into addons/
 ```
 
-This runs offline and exits non-zero on any failure. To test the SQL store against real SQLite, Postgres and MariaDB, link dot-sql into `addons/` and run:
+These run offline and exits non-zero on any failure. To test the SQL store against real SQLite, Postgres and MariaDB, link dot-sql into `addons/` and run:
 
 ```bash
 ../dot-sql/tools/test_live.sh . res://examples/achievements_sql_live.tscn

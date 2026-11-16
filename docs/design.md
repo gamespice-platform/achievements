@@ -76,6 +76,28 @@ Both writes are idempotent: a re-sent define changes nothing, and an unlock alre
 
 The reporter refuses a `backbone:`-prefixed account id as a player key before it leaves the process, which is dot-stats' rule and dot-user's reason: an operator must not be able to correlate their players across servers, and a report carrying an account uid would undo that from the reporting side.
 
+## The points reporter
+
+`DotPointsReporter` (a Node, configured by `DotPointsReporterConfig`) reports what happened on a dedicated server to Gamespice app points, as website-city's `docs/app-points.md` defines it:
+
+```
+POST /api/integration/v1/points/events      (POINTS_WRITE)
+  { "batch": "<JSON text>", "sig": "<base64>" }
+  batch = { "v": 1, "app", "server", "events": [ { "eventId", "eventKey", "player", "at", "count"?, "meta"?: { "humans"?, "vsBot"? } } ] }
+```
+
+**A game says what happened, never what it is worth.** The owner sets the amount for each event key on the site, so no amount is sent, and `report()` refuses any meta key other than `humans` and `vsBot`. Event keys, player keys, eventIds and counts are checked against the site's own patterns before anything is queued, so a mistake fails at the call that made it.
+
+**Retries cannot pay twice.** Every event gets its eventId when it is reported (`<boot>:<seq>` unless the game passes its own, such as `match:round:seq`). Each batch is signed once and kept as the exact `{batch, sig}` pair until the site answers it, and a resend is those same bytes; the site deduplicates on (app, server, eventId). Only a network fault, a 5xx or a 429 is resent. Any other 4xx (`bad_batch`, 413 `batch_too_large`, `bad_signature`, `no_key`, `points_disabled`) would fail the same way for ever, so that batch is dropped, logged at ERROR and emitted as `batch_dropped`.
+
+**Signing is dot-cloud's.** The batch is signed with `DotCloudSignature.sign` (RSA PKCS#1 v1.5 over SHA-256, base64), found by class name at run time, so this addon still loads without dot-cloud; a host can set `signer` instead. Godot has no Ed25519, so the key the owner registers must be RSA, at least 2048 bits, with alg `RSA_SHA256`. `configure()` test-signs at boot, so a bad key fails there and not on the first kill.
+
+**Server only.** `report()` refuses on a web build and on a multiplayer client. Clients never report and never send amounts.
+
+**No silent limits.** `max_batch_events` and `max_pending_events` are 0 for unlimited; negative values fail `validate()`. A full queue makes `report()` fail with `CODE_STATE` and an ERROR log, and nothing already held is dropped. Keep `max_batch_events` at or under the site's `appPoints.maxEventsPerBatch`.
+
+**Registering the key is an owner step.** The app owner registers the server's public key (SPKI PEM, the `public` half of `DotCloudSignature.generate_keypair()`) with `POST /api/app/v1/apps/:id/points/keys` and `{serverId, alg: "RSA_SHA256", publicKey}`. Registering it automatically at enrolment is not built. The private key stays on the server: give it by `private_key_path`, or by `private_key_pem` from code. `private_key_pem` is a sensitive key and is refused from the environment and the command line.
+
 ## Deliberately not here
 
 - **Art, toasts and a list screen.** `listing()` gives you rows; dot-ui gives you somewhere to put them. `icon_id` is an id this addon never resolves.
