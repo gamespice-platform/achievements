@@ -57,6 +57,6 @@ The points suite prints four `ERR achievements.points` lines (a PEM that is not 
 - Never send a `backbone:` account id as a player key. [design](docs/design.md#the-backbone-reporter)
 - The define and unlock bodies are website-city's `~/types/integration/achievements.ts` schemas; change both sides together and re-check them side by side. [design](docs/design.md#the-backbone-reporter)
 
-- The points reporter never sends an amount, signs each batch once and resends it byte-identical, and resends only on a network fault, 5xx or 429. Its body is website-city's `docs/app-points.md`; change both sides together. [design](docs/design.md#the-points-reporter)
+- The points reporter never sends an amount, signs each batch once and resends it byte-identical, and resends only on a network fault, 5xx or 429. Its body is website-city's `docs/app-points.md`; change both sides together. Unsent events are journalled (`persist_queue`, default on) and replayed by the next `configure()` on the same file; never drop that journal on a restart. [design](docs/design.md#the-points-reporter) [design](docs/design.md#the-points-reporter)
 
 Deliberately not here: art and toasts, counting, tier implication, cross-server totals beyond a shared store, anti-cheat. [design](docs/design.md#deliberately-not-here)

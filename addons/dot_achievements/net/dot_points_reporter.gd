@@ -24,6 +24,10 @@ extends Node
 ## the site deduplicates on (app, server, eventId). Signing goes through dot-cloud's
 ## [code]DotCloudSignature.sign[/code] (RSA-SHA256), reached by name so this addon still
 ## loads without dot-cloud; [member signer] replaces it.
+##
+## Unsent events survive a crash: with [member DotPointsReporterConfig.persist_queue] on
+## (the default) every event, sealed batch and answer is appended to a journal file, and
+## the next [method configure] on the same file queues what was never answered again.
 
 signal events_settled(results: Array)
 signal batch_dropped(event_ids: PackedStringArray, error: String)
@@ -55,6 +59,10 @@ var refused: int = 0
 var dropped: int = 0
 var failures: int = 0
 var last_error: String = ""
+## Events read back from the journal of an earlier run and queued again.
+var replayed: int = 0
+## The last time the journal could not be written; "" while it is fine.
+var journal_error: String = ""
 
 var _key_pem: String = ""
 var _boot_id: String = ""
@@ -64,6 +72,9 @@ var _queue: Array[Dictionary] = []
 var _outbox: Array[Dictionary] = []
 var _flushing: bool = false
 var _timer: Timer = null
+# The journal file ("" = not persisting) and whether it was read in this process.
+var _journal_path: String = ""
+var _journal_loaded: String = ""
 
 var _id_re := RegEx.create_from_string("^[A-Za-z0-9_.:-]{1,128}$")
 var _key_re := RegEx.create_from_string("^[a-z0-9_.:-]{1,64}$")
@@ -109,12 +120,17 @@ func configure(p_config: DotPointsReporterConfig) -> DotResult:
 
 	config = p_config
 	_key_pem = pem
+	_journal_path = "" if DotPlatform.is_web() else config.resolved_queue_path()
+	if _journal_path != "" and _journal_loaded != _journal_path:
+		_journal_loaded = _journal_path
+		_replay_journal()
 	_restart_timer()
 	DotLog.info(CHANNEL, "points reporter configured", {
 		"app": config.app_id, "server": config.server_id,
 		"flush_interval_secs": config.flush_interval_secs,
 		"max_batch_events": config.max_batch_events,
 		"max_pending_events": config.max_pending_events,
+		"queue_path": _journal_path, "replayed": replayed,
 	})
 	return DotResult.success(null)
 
@@ -222,6 +238,7 @@ func report(
 		ev["meta"] = clean_meta
 	_queue.append(ev)
 	reported += 1
+	_journal_append({"e": ev})
 	return DotResult.success(id)
 
 
@@ -273,6 +290,7 @@ func flush() -> DotResult:
 			else:
 				_outbox.pop_front()
 				var ids: PackedStringArray = entry["ids"]
+				_journal_append({"d": Array(ids)})
 				dropped += ids.size()
 				DotLog.error(CHANNEL, "the site refused a points batch; it was dropped", {
 					"dropped": ids.size(), "error": last_error, "scope": SCOPE_WRITE,
@@ -282,6 +300,7 @@ func flush() -> DotResult:
 			return res.wrap("Could not report points events.")
 
 		_outbox.pop_front()
+		_journal_append({"d": Array(entry["ids"] as PackedStringArray)})
 		var results: Array = []
 		if res.value is Dictionary and (res.value as Dictionary).get("results") is Array:
 			results = (res.value as Dictionary)["results"]
@@ -295,6 +314,8 @@ func flush() -> DotResult:
 	_warned_full = false
 	_warned_no_client = false
 	_flushing = false
+	if pending() == 0:
+		_journal_rewrite()
 	return DotResult.success(answered)
 
 
@@ -318,6 +339,7 @@ func _seal() -> DotResult:
 		for ev in events:
 			ids.append(str(ev["eventId"]))
 		_outbox.append({"batch": text, "sig": str(sig.value), "ids": ids})
+		_journal_append({"b": {"batch": text, "sig": str(sig.value), "ids": Array(ids)}})
 		for i in take:
 			_queue.pop_front()
 	return DotResult.success(null)
@@ -369,6 +391,165 @@ func _sign(bytes: PackedByteArray, pem: String) -> DotResult:
 	return script.call("sign", bytes, pem)
 
 
+# One JSON line each: {"e": event} queued, {"b": {batch, sig, ids}} sealed, {"d": [ids]}
+# answered or dropped. Appending keeps report() cheap however long the site is away;
+# the file is rewritten whole only at load and once nothing is pending.
+func _journal_append(entry: Dictionary) -> void:
+	if _journal_path == "":
+		return
+	var f: FileAccess = null
+	if FileAccess.file_exists(_journal_path):
+		f = FileAccess.open(_journal_path, FileAccess.READ_WRITE)
+		if f != null:
+			f.seek_end()
+	else:
+		DirAccess.make_dir_recursive_absolute(_journal_path.get_base_dir())
+		f = FileAccess.open(_journal_path, FileAccess.WRITE)
+	if f == null:
+		_journal_failed(error_string(FileAccess.get_open_error()))
+		return
+	f.store_line(JSON.stringify(entry))
+	f.close()
+	_journal_ok()
+
+
+# Writes what is pending now as a fresh journal (temp file, then rename), or removes the
+# file when nothing is.
+func _journal_rewrite() -> void:
+	if _journal_path == "":
+		return
+	if pending() == 0:
+		if FileAccess.file_exists(_journal_path):
+			var err := DirAccess.remove_absolute(_journal_path)
+			if err != OK:
+				_journal_failed("remove: %s" % error_string(err))
+				return
+		_journal_ok()
+		return
+	DirAccess.make_dir_recursive_absolute(_journal_path.get_base_dir())
+	var tmp := _journal_path + ".tmp"
+	var f := FileAccess.open(tmp, FileAccess.WRITE)
+	if f == null:
+		_journal_failed(error_string(FileAccess.get_open_error()))
+		return
+	for entry in _outbox:
+		f.store_line(JSON.stringify({"b": {
+			"batch": entry["batch"], "sig": entry["sig"], "ids": Array(entry["ids"] as PackedStringArray),
+		}}))
+	for ev in _queue:
+		f.store_line(JSON.stringify({"e": ev}))
+	f.close()
+	var moved := DirAccess.rename_absolute(tmp, _journal_path)
+	if moved != OK:
+		_journal_failed("rename: %s" % error_string(moved))
+		return
+	_journal_ok()
+
+
+func _journal_failed(why: String) -> void:
+	# Loud once per outage: events are still held in memory and sent, but a crash now
+	# would lose them.
+	if journal_error == "":
+		DotLog.error(CHANNEL, "cannot write the points journal; unsent events would not survive a crash", {
+			"queue_path": _journal_path, "error": why,
+		})
+	journal_error = why
+
+
+func _journal_ok() -> void:
+	if journal_error != "":
+		DotLog.info(CHANNEL, "the points journal is being written again", {"queue_path": _journal_path})
+	journal_error = ""
+
+
+# Reads the journal an earlier run left and queues its unanswered events ahead of
+# anything reported in this run. A torn last line (a crash mid-write) is skipped.
+func _replay_journal() -> void:
+	if not FileAccess.file_exists(_journal_path):
+		return
+	var f := FileAccess.open(_journal_path, FileAccess.READ)
+	if f == null:
+		_journal_failed("read: %s" % error_string(FileAccess.get_open_error()))
+		return
+	var events := {}  # eventId -> event, in report order
+	var batches: Array[Dictionary] = []
+	var done := {}
+	var torn := 0
+	while not f.eof_reached():
+		var line := f.get_line().strip_edges()
+		if line == "":
+			continue
+		var json := JSON.new()
+		var parsed: Variant = json.data if json.parse(line) == OK else null
+		if not parsed is Dictionary:
+			torn += 1
+			continue
+		var d: Dictionary = parsed
+		if d.get("e") is Dictionary:
+			var ev := _event_from_json(d["e"])
+			var eid := str(ev.get("eventId", ""))
+			if eid != "":
+				events[eid] = ev
+		elif d.get("b") is Dictionary:
+			var b: Dictionary = d["b"]
+			var ids := PackedStringArray()
+			for x in b.get("ids", []):
+				ids.append(str(x))
+				events.erase(str(x))
+			if ids.size() > 0 and str(b.get("batch", "")) != "":
+				batches.append({"batch": str(b["batch"]), "sig": str(b.get("sig", "")), "ids": ids})
+		elif d.get("d") is Array:
+			for x in d["d"]:
+				done[str(x)] = true
+				events.erase(str(x))
+	f.close()
+
+	var known := {}
+	for entry in _outbox:
+		for x in entry["ids"]:
+			known[x] = true
+	for ev in _queue:
+		known[str(ev["eventId"])] = true
+	var old_outbox: Array[Dictionary] = []
+	var old_queue: Array[Dictionary] = []
+	for b in batches:
+		var ids: PackedStringArray = b["ids"]
+		if done.has(ids[0]) or known.has(ids[0]):
+			continue
+		old_outbox.append(b)
+		replayed += ids.size()
+	for eid in events:
+		if known.has(eid):
+			continue
+		old_queue.append(events[eid])
+		replayed += 1
+	var old_batches := old_outbox.size()
+	old_outbox.append_array(_outbox)
+	_outbox = old_outbox
+	old_queue.append_array(_queue)
+	_queue = old_queue
+	if torn > 0:
+		DotLog.warn(CHANNEL, "skipped unreadable lines in the points journal", {
+			"queue_path": _journal_path, "lines": torn,
+		})
+	if replayed > 0:
+		DotLog.info(CHANNEL, "resending points events an earlier run did not get answered", {
+			"queue_path": _journal_path, "events": replayed, "batches": old_batches,
+		})
+	_journal_rewrite()
+
+
+# JSON reads every number back as a float; the site's event fields are integers.
+static func _event_from_json(raw: Dictionary) -> Dictionary:
+	var ev := raw.duplicate(true)
+	for k in ["at", "count"]:
+		if ev.has(k):
+			ev[k] = int(ev[k])
+	if ev.get("meta") is Dictionary and (ev["meta"] as Dictionary).has("humans"):
+		ev["meta"]["humans"] = int(ev["meta"]["humans"])
+	return ev
+
+
 func _client() -> Object:
 	if client != null and is_instance_valid(client):
 		return client
@@ -405,6 +586,9 @@ func describe() -> Dictionary:
 		"dropped": dropped,
 		"failures": failures,
 		"last_error": last_error,
+		"queue_path": _journal_path,
+		"replayed": replayed,
+		"journal_error": journal_error,
 	}
 
 
@@ -419,4 +603,6 @@ func describe_lines() -> PackedStringArray:
 		out.append("  no backbone client; events are waiting")
 	if last_error != "":
 		out.append("  last error: %s" % last_error)
+	if journal_error != "":
+		out.append("  journal not written (a crash would lose pending events): %s" % journal_error)
 	return out

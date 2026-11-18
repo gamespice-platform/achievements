@@ -96,6 +96,8 @@ POST /api/integration/v1/points/events      (POINTS_WRITE)
 
 **No silent limits.** `max_batch_events` and `max_pending_events` are 0 for unlimited; negative values fail `validate()`. A full queue makes `report()` fail with `CODE_STATE` and an ERROR log, and nothing already held is dropped. Keep `max_batch_events` at or under the site's `appPoints.maxEventsPerBatch`.
 
+**Unsent events survive a crash.** With `persist_queue` on (the default) every queued event, sealed batch and answer is appended to a journal, one JSON line each, at `queue_path` (default `user://dot_points/queue-<app>-<server>.jsonl`). The next `configure()` on the same file queues what was never answered ahead of anything new: a sealed batch as the same signed bytes, an unsealed event with the same eventId, so the site's (app, server, eventId) dedup makes a replay harmless. Appending keeps `report()` cheap while the site is away; the file is rewritten at load and removed once nothing is pending. A torn last line from a crash mid-write is skipped. A journal that cannot be written is an ERROR once and `journal_error` in `describe()`; the events are still held in memory and sent. Give each server process its own file.
+
 **Registering the key is an owner step.** The app owner registers the server's public key (SPKI PEM, the `public` half of `DotCloudSignature.generate_keypair()`) with `POST /api/app/v1/apps/:id/points/keys` and `{serverId, alg: "RSA_SHA256", publicKey}`. Registering it automatically at enrolment is not built. The private key stays on the server: give it by `private_key_path`, or by `private_key_pem` from code. `private_key_pem` is a sensitive key and is refused from the environment and the command line.
 
 ## Deliberately not here

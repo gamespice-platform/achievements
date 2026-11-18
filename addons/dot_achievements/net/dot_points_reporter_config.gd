@@ -29,6 +29,24 @@ extends DotConfig
 ## loudly rather than dropping anything.
 @export var max_pending_events: int = 0
 
+## Keep unsent events in a journal file, so a crash or restart does not lose earned
+## points: the next configure() with the same file resends them (the same eventIds and,
+## for a sealed batch, the same signed bytes, so the site never pays twice).
+@export var persist_queue: bool = true
+
+## The journal file. Empty = user://dot_points/queue-<app_id>-<server_id>.jsonl, so two
+## servers on one host never share one. Give each server process its own file.
+@export var queue_path: String = ""
+
+
+## The journal file this config writes, or "" when [member persist_queue] is off.
+func resolved_queue_path() -> String:
+	if not persist_queue:
+		return ""
+	if queue_path.strip_edges() != "":
+		return queue_path.strip_edges()
+	return "user://dot_points/queue-%d-%d.jsonl" % [app_id, server_id]
+
 
 func env_prefix() -> String:
 	return "DOT_POINTS_"
@@ -58,6 +76,8 @@ func validate() -> DotResult:
 		problems.append("flush_interval_secs must be 0 (no timer) or more (is %s)" % flush_interval_secs)
 	if max_batch_events < 0:
 		problems.append("max_batch_events must be 0 (unlimited) or more (is %d)" % max_batch_events)
+	if persist_queue and queue_path.strip_edges().ends_with("/"):
+		problems.append("queue_path must name a file, not a folder (is %s)" % queue_path)
 	if max_pending_events < 0:
 		problems.append("max_pending_events must be 0 (unlimited) or more (is %d)" % max_pending_events)
 	if not problems.is_empty():

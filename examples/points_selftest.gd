@@ -7,8 +7,9 @@ extends "res://examples/achievements_selftest_sql.gd"
 ## godot --headless --path . res://examples/points_selftest.tscn
 ## [/codeblock]
 
-const SECTIONS := 7
-const CHECKS := 49
+const SECTIONS := 8
+const CHECKS := 58
+const JOURNAL := "user://points_selftest/queue.jsonl"
 
 
 ## A stand-in for dot-auth's DotBackboneClient. [member fail_with] fails the next posts.
@@ -55,6 +56,7 @@ func _run() -> void:
 	await _test_retry()
 	await _test_limits()
 	await _test_timer()
+	await _test_journal()
 
 	_line("")
 	_line("%d sections, %d passed, %d failed" % [_section_count, _passed, _failed])
@@ -75,6 +77,7 @@ func _config(batch: int = 100, pending_cap: int = 0, interval: float = 0.0) -> D
 	c.flush_interval_secs = interval
 	c.max_batch_events = batch
 	c.max_pending_events = pending_cap
+	c.persist_queue = false
 	return c
 
 
@@ -254,4 +257,60 @@ func _test_timer() -> void:
 	await get_tree().create_timer(0.6).timeout
 	_check(backbone.calls.size() == 1 and r.pending() == 0, "the timer sent the event")
 	_check(r.describe()["accepted"] == 1 and r.describe_lines().size() >= 1, "describe() reports it")
+	r.queue_free()
+
+
+func _test_journal() -> void:
+	_section("journal: unsent events survive a crash and are resent once")
+
+	var c := _config(2)
+	_check(c.persist_queue == false and DotPointsReporterConfig.new().persist_queue, "persisting is the default (off here for the other sections)")
+	var plain := DotPointsReporterConfig.new()
+	plain.app_id = 7
+	plain.server_id = 42
+	_check(plain.resolved_queue_path().contains("queue-7-42"), "the default journal is per app and server")
+
+	DirAccess.remove_absolute(JOURNAL)
+	c.persist_queue = true
+	c.queue_path = JOURNAL
+	var made := _reporter(c)
+	var r: DotPointsReporter = made[0]
+	var backbone: FakeBackbone = made[1]
+	r.report("u_ada", "kill", 1, {"humans": 4})
+	r.report("u_bo", "kill", 2)
+	r.report("u_cy", "kill")
+	backbone.fail_with = DotError.from_http(503)
+	await r.flush()
+	var first_try: Dictionary = backbone.calls[0]["body"]
+	r.report("u_di", "kill")
+	# A crash: the node goes away with four events unanswered and nothing flushed.
+	r.free()
+	_check(FileAccess.file_exists(JOURNAL), "the journal file holds the unsent events")
+
+	made = _reporter(c)
+	r = made[0]
+	backbone = made[1]
+	_check(r.replayed == 4 and r.pending() == 4, "a new reporter on the same file queues them again")
+	var sent: DotResult = await r.flush()
+	_check(sent.ok and backbone.calls.size() == 3, "and sends them: two sealed batches, then the one left queued")
+	var again: Dictionary = backbone.calls[0]["body"]
+	_check(again["batch"] == first_try["batch"] and again["sig"] == first_try["sig"], "a sealed batch is resent byte-identical")
+	_check(r.pending() == 0 and not FileAccess.file_exists(JOURNAL), "once answered the journal is removed")
+	r.queue_free()
+
+	var f := FileAccess.open(JOURNAL, FileAccess.WRITE)
+	f.store_line(JSON.stringify({"e": {"eventId": "m1:1", "eventKey": "kill", "player": "u_ed", "at": 1700000000, "count": 3}}))
+	f.store_string("{\"e\": {\"eventId\": \"m1:2\", \"eve")
+	f.close()
+	made = _reporter(c)
+	r = made[0]
+	var ev: Dictionary = r._queue[0] if r._queue.size() == 1 else {}
+	_check(r.replayed == 1 and typeof(ev.get("at")) == TYPE_INT and typeof(ev.get("count")) == TYPE_INT, "a torn last line is skipped; the rest comes back with integer fields")
+	r.queue_free()
+	DirAccess.remove_absolute(JOURNAL)
+
+	made = _reporter(_config())
+	r = made[0]
+	r.report("u_fy", "kill")
+	_check(r.describe()["queue_path"] == "" and not FileAccess.file_exists(JOURNAL), "persist_queue off writes nothing")
 	r.queue_free()
