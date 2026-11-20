@@ -1,4 +1,4 @@
-[![dot-achievements - GameSpice addon](docs/banner.png)](https://moddingcommunity.com/a/233-dot-achievements)
+[![Achievements - GameSpice addon](docs/banner.png)](https://moddingcommunity.com/a/233-dot-achievements)
 
 Achievements for Godot 4.7+, kept as data. You declare rules over per-player numbers once, and a dedicated server can check what a player has earned without loading any picture, icon or scene. Part of the [dot-*](https://github.com/gamespice-platform) family.
 
@@ -62,7 +62,7 @@ tracker.store = store
 
 The SQL store keeps one row per held number and one row per unlock (`dot_achievement_values` and `dot_achievement_unlocks`; both table names are configurable). That makes "how many players earned this" a query. Saves are batched and serialised per player.
 
-## With dot-stats
+## With Stats
 
 ```gdscript
 var link := DotAchievementStatsLink.new()
