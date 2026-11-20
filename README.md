@@ -1,3 +1,5 @@
+[![dot-achievements - GameSpice addon](docs/banner.png)](https://moddingcommunity.com/a/233-dot-achievements)
+
 Achievements for Godot 4.7+, kept as data. You declare rules over per-player numbers once, and a dedicated server can check what a player has earned without loading any picture, icon or scene. Part of the [dot-*](https://github.com/gamespice-platform) family.
 
 It supports counters, bests, tiers, hidden and secret entries, progress that is never misreported, a pluggable store (memory, a file per player, or SQL), a batched reporter for the TMC back end, and a signed points event reporter for Gamespice app points.
