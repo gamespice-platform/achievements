@@ -16,9 +16,9 @@ const SECTIONS := 14
 const CHECKS := 180
 
 
-## A stand-in for dot-stats' tracker, which this addon never names.
+## A stand-in for GameSpice Stats' tracker, which this addon never names.
 ##
-## The important part is the signal's payload: dot-stats emits the player's running
+## The important part is the signal's payload: GameSpice Stats emits the player's running
 ## SESSION total, not the reading that caused it.
 class FakeStats extends Node:
 	signal recorded(player_id: StringName, stat_id: StringName, value: float)
@@ -37,7 +37,7 @@ class FakeStats extends Node:
 				sessions[key] = 0.0
 
 
-## A stand-in for dot-auth's DotBackboneClient.
+## A stand-in for GameSpice Auth's DotBackboneClient.
 class FakeBackbone extends RefCounted:
 	var calls: Array[Dictionary] = []
 	var fail: bool = false
@@ -372,7 +372,7 @@ func _test_listing() -> void:
 	tracker.queue_free()
 
 
-# --- The dot-stats bridge --------------------------------------------------
+# --- The GameSpice Stats bridge --------------------------------------------------
 
 func _test_stats_link() -> void:
 	_section("the dot-stats bridge")
@@ -390,7 +390,7 @@ func _test_stats_link() -> void:
 
 	_check(link.describe()["connected"], "the link connects")
 
-	# dot-stats emits the SESSION total, not the reading. Wiring the signal straight
+	# GameSpice Stats emits the SESSION total, not the reading. Wiring the signal straight
 	# into record() would add 1, then 2, then 3, then 4 — ten after four kills.
 	for i in 4:
 		stats.record(&"ada", &"kills", 1.0)
@@ -459,7 +459,7 @@ func _test_reporter() -> void:
 
 	_check(reporter.is_available(), "a reporter with a client is available")
 
-	# dot-user's whole design is that an operator cannot correlate their players
+	# GameSpice User's whole design is that an operator cannot correlate their players
 	# across servers. A report carrying an account uid would undo it from this side.
 	var refused := reporter.queue("backbone:12345", &"k10", 1)
 	_check(

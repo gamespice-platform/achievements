@@ -1,10 +1,10 @@
-# dot-achievements
+# GameSpice Achievements
 
 Achievements as rules over per-player lifetime numbers: declared once, checkable without loading art, stored behind a pluggable store (memory, file, SQL), reported to the backbone in batches.
 
 Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is specific to achievements.
 
-**The distributable is `addons/dot_achievements/`.** It requires [dot-core](../dot-core) and nothing else. dot-sql and dot-cloud are linked into `addons/` (gitignored) only for the suites; the addon reaches a SQL driver untyped and `DotCloudSignature` by class name.
+**The distributable is `addons/dot_achievements/`.** It requires [GameSpice Core](../dot-core) and nothing else. dot-sql and dot-cloud are linked into `addons/` (gitignored) only for the suites; the addon reaches a SQL driver untyped and `DotCloudSignature` by class name.
 
 ```bash
 ln -s ../../dot-core/addons/dot_core addons/dot_core
@@ -25,12 +25,12 @@ ln -s ../../dot-cloud/addons/dot_cloud addons/dot_cloud   # the suites only
 | --- | --- |
 | `core/` | `DotAchievementRule` (one condition; `Merge`, `merge_value`), `DotAchievement` (rules, tiers, `to_player_dictionary`), `DotAchievementCatalogue` (`validate()` and the stat index), `DotAchievementProgress` |
 | `runtime/dot_achievement_tracker.gd` | `DotAchievementTracker`: load, record, evaluate, save, `listing()`, drives the reporter |
-| `runtime/dot_achievement_stats_link.gd` | `DotAchievementStatsLink`: dot-stats session totals to lifetime deltas |
+| `runtime/dot_achievement_stats_link.gd` | `DotAchievementStatsLink`: GameSpice Stats session totals to lifetime deltas |
 | `store/` | `DotAchievementStore` (the seam), `...StoreMemory` (the default), `...StoreFile`, `...StoreSql` and `DotAchievementSqlSchema` |
 | `net/dot_achievement_reporter.gd` | `DotAchievementReporter`: define, unlock, player routes on the backbone |
 | `net/dot_points_reporter.gd`, `net/dot_points_reporter_config.gd` | `DotPointsReporter`, `DotPointsReporterConfig`: signed points events to Gamespice app points |
 | `examples/achievements_selftest.tscn` | the suite; offline, non-zero on failure |
-| `examples/points_selftest.tscn` | the points reporter suite; offline, needs dot-cloud linked |
+| `examples/points_selftest.tscn` | the points reporter suite; offline, needs GameSpice Cloud linked |
 | `examples/achievements_sql_live.tscn` | the SQL store against real databases |
 
 Paths except `examples/` are in `addons/dot_achievements/`.
@@ -45,15 +45,15 @@ The points suite prints four `ERR achievements.points` lines (a PEM that is not 
 
 ## Rules that bite
 
-- Nothing here counts; the game or dot-stats counts. Never import dot-stats or use `DotStatsValues`. [design](docs/design.md#what-this-is-and-what-it-is-not)
+- Nothing here counts; the game or GameSpice Stats counts. Never import GameSpice Stats or use `DotStatsValues`. [design](docs/design.md#what-this-is-and-what-it-is-not)
 - `DotAchievementRule.Merge` must keep matching `DotStatsDef.Kind` and website-city's `PlayerStatMerge`; change all three together. [design](docs/design.md#the-merge-borrowed-on-purpose)
-- dot-stats readings go through `DotAchievementStatsLink`, never straight into `record()`. [design](docs/design.md#the-bridge-is-a-class-not-one-connect)
+- GameSpice Stats readings go through `DotAchievementStatsLink`, never straight into `record()`. [design](docs/design.md#the-bridge-is-a-class-not-one-connect)
 - `record` refuses a player not loaded (`CODE_STATE`); a store that cannot read fails, never returns a fresh player; a failed save leaves the dirty flag set. [design](docs/design.md#a-player-must-be-begun)
 - The catalogue's `validate()` builds the stat index and refuses duplicate ids, one stat with two merges, orphan tiers. [design](docs/design.md#the-index-and-why-the-catalogue-is-a-class)
 - Hidden and secret are stripped in `to_player_dictionary`, never only in a UI. [design](docs/design.md#details-that-look-arbitrary-and-are-not)
 - `merge_value` takes `has_current`; comparisons carry an epsilon; points are recounted on load. [design](docs/design.md#details-that-look-arbitrary-and-are-not)
 - File store names are slug plus hash of the whole key; the tracker defaults to memory; file writes call `DotWeb.sync_filesystem()`. [design](docs/design.md#details-that-look-arbitrary-and-are-not)
-- The SQL store names no dot-sql class, saves the whole progress as one batch with deletes last, and serialises saves per player. [design](docs/design.md#sql-storage-through-dot-sql)
+- The SQL store names no GameSpice SQL class, saves the whole progress as one batch with deletes last, and serialises saves per player. [design](docs/design.md#sql-storage-through-dot-sql)
 - Never send a `backbone:` account id as a player key. [design](docs/design.md#the-backbone-reporter)
 - The define and unlock bodies are website-city's `~/types/integration/achievements.ts` schemas; change both sides together and re-check them side by side. [design](docs/design.md#the-backbone-reporter)
 

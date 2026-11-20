@@ -6,7 +6,7 @@ extends RefCounted
 ## website-city serves the three routes below, written against this class and checked
 ## side by side with it (its `~/types/integration/achievements.ts`, whose unit test is
 ## fed bodies captured from this reporter). The lesson that made that check a rule:
-## dot-leaderboard's and dot-stats' reporters were both found sending their own file
+## GameSpice Leaderboard's and GameSpice Stats' reporters were both found sending their own file
 ## formats where the backbone's schemas expected something else, and every request
 ## either would have made would have been refused.
 ##
@@ -36,8 +36,8 @@ extends RefCounted
 ## site has no definition for is named in [code]refused[/code] on a 200, and
 ## [method flush] logs it at ERROR, since those unlocks are gone.
 ##
-## [b]A player key is a pseudonym, never an account id.[/b] Same rule dot-stats
-## enforces and for the same reason: dot-user's whole design is that an operator
+## [b]A player key is a pseudonym, never an account id.[/b] Same rule GameSpice Stats
+## enforces and for the same reason: GameSpice User's whole design is that an operator
 ## cannot correlate their players across servers, and a report that carried an
 ## account uid would undo it from the reporting side. An id beginning with
 ## [code]backbone:[/code] is refused before it leaves the process.
@@ -56,7 +56,7 @@ const PLAYER_PATH := "achievements/player"
 const ACCOUNT_PREFIX := "backbone:"
 
 ## The backbone client. Any object with
-## [code]post_integration(String, Dictionary)[/code] — dot-auth's
+## [code]post_integration(String, Dictionary)[/code] — GameSpice Auth's
 ## [code]DotBackboneClient[/code] in practice, which is not named here.
 var client: Object = null
 

@@ -1,12 +1,12 @@
 # Design
 
-Why dot-achievements is shaped the way it is, and why the obvious alternative is wrong in each case.
+Why GameSpice Achievements is shaped the way it is, and why the obvious alternative is wrong in each case.
 
 ## What this is, and what it is not
 
 A **stat** is a number about a player; dot-stats has those. An **achievement** is a condition over one or more of them, plus what it is called and what it is worth. Nothing here counts anything: the game counts, and this decides.
 
-The two addons do not import each other, and this one carries its own values rather than dot-stats' `DotStatsValues`, for the family reason (naming an absent `class_name` fails to parse) and for a real one: these are **lifetime** numbers and dot-stats' are a **session**.
+The two addons do not import each other, and this one carries its own values rather than GameSpice Stats' `DotStatsValues`, for the family reason (naming an absent `class_name` fails to parse) and for a real one: these are **lifetime** numbers and GameSpice Stats' are a **session**.
 
 ## The merge, borrowed on purpose
 
@@ -14,7 +14,7 @@ The two addons do not import each other, and this one carries its own values rat
 
 ## The bridge is a class, not one `connect`
 
-dot-stats emits `recorded(player, stat, value)` where `value` is the player's running **session** total: its whole design is that a session is what a server counts and a delta is what it reports. Wiring that straight into `record()` adds the session total to the lifetime total on every reading: 1, then 3, then 6, then 10 after four kills.
+GameSpice Stats emits `recorded(player, stat, value)` where `value` is the player's running **session** total: its whole design is that a session is what a server counts and a delta is what it reports. Wiring that straight into `record()` adds the session total to the lifetime total on every reading: 1, then 3, then 6, then 10 after four kills.
 
 `DotAchievementStatsLink` holds the last session value per player and stat and files the difference. A value that goes **down** is a new session, not a negative delta. Only `SUM` stats are differenced: a personal best is an absolute in both systems and differencing one would be meaningless.
 
@@ -49,9 +49,9 @@ A reading arrives and something has to decide which achievements it could have m
 - **The tracker defaults to a memory store.** A default that silently starts writing a file per player under `user://` on a dedicated server is one nobody notices until the disk is full.
 - **`DotAchievementStoreFile` calls `DotWeb.sync_filesystem()` after every write**, because `user://` in a browser is an IndexedDB mirror. Otherwise nothing here is platform-specific: no socket and no thread.
 
-## SQL storage, through dot-sql
+## SQL storage, through GameSpice SQL
 
-`DotAchievementStoreSql` is the store for a community whose servers share progress. It holds its driver **untyped** and asks it for `query`, `batch`, `upsert_sql`, `dialect` and `migrate`, so no file in the addon names a dot-sql class and the addon parses without it. Its tables are `DotAchievementSqlSchema`'s plain-dictionary specs, rendered per dialect by the driver, and a database written by a newer build is refused at `open()` rather than read and saved back. A store that is not open fails the load with `CODE_STATE`.
+`DotAchievementStoreSql` is the store for a community whose servers share progress. It holds its driver **untyped** and asks it for `query`, `batch`, `upsert_sql`, `dialect` and `migrate`, so no file in the addon names a GameSpice SQL class and the addon parses without it. Its tables are `DotAchievementSqlSchema`'s plain-dictionary specs, rendered per dialect by the driver, and a database written by a newer build is refused at `open()` rather than read and saved back. A store that is not open fails the load with `CODE_STATE`.
 
 - **Two narrow tables, not a JSON column.** A `progress` column holding the file store's document would be the shortest SQL store there is, and the one nobody can ask "how many have earned this" or "who was first" without parsing every row. `(achievement, unlocked_at)` is indexed for exactly that.
 - **A load goes through `DotAchievementProgress.from_dictionary`**, the file store's own parser, so the two cannot disagree about what a progress is. The points total is not stored; the tracker recounts it on load.
@@ -68,13 +68,13 @@ POST /api/integration/v1/achievements/unlock
 GET  /api/integration/v1/achievements/player
 ```
 
-`define` sends the catalogue in this addon's own shape, `DotAchievement.to_dictionary()` (`id`, `require_all`, `icon`, rules as `{stat, op, value, merge}` with the lower-case names), and the site takes exactly that; it also accepts `key` for `id`, and ignores `app` because the credential names the owner. `unlock` uses the backbone's field names (`player`, `key`, `unlockedAt` in Unix seconds). The two sides were checked side by side: the site's schema test is fed bodies captured from this reporter over a real game's catalogue, and the reporter has been driven through dot-auth's `DotBackboneClient` against a running site. Do that again after changing either side, because the family has twice found a reporter sending its own shape where a schema expected another (dot-leaderboard's and dot-stats'), and every request either would have made would have been refused.
+`define` sends the catalogue in this addon's own shape, `DotAchievement.to_dictionary()` (`id`, `require_all`, `icon`, rules as `{stat, op, value, merge}` with the lower-case names), and the site takes exactly that; it also accepts `key` for `id`, and ignores `app` because the credential names the owner. `unlock` uses the backbone's field names (`player`, `key`, `unlockedAt` in Unix seconds). The two sides were checked side by side: the site's schema test is fed bodies captured from this reporter over a real game's catalogue, and the reporter has been driven through GameSpice Auth's `DotBackboneClient` against a running site. Do that again after changing either side, because the family has twice found a reporter sending its own shape where a schema expected another (GameSpice Leaderboard's and GameSpice Stats'), and every request either would have made would have been refused.
 
 Both writes are idempotent: a re-sent define changes nothing, and an unlock already on file only ever moves its time earlier. An unlock for an achievement the site has no definition for is named in `refused` on a 200 while the rest applies; `flush()` logs it at ERROR, because the tracker declares before it flushes and a refusal therefore means a define that failed or an id missing from the catalogue.
 
 **The tracker drives the reporter; nothing else does.** With `report_to_backbone` on, `DotAchievementTracker` calls `report()` every `report_interval` seconds (10 by default): it declares the catalogue once (retried on a doubling delay while the backbone is unreachable, abandoned after a refusal it will not retry) and then flushes the queue. The tracker is the owner because it is the node a host already places and the family has no autoload to hang a timer on. A host may `await tracker.report()` itself before shutting down, so the last round's unlocks are not left queued.
 
-The reporter refuses a `backbone:`-prefixed account id as a player key before it leaves the process, which is dot-stats' rule and dot-user's reason: an operator must not be able to correlate their players across servers, and a report carrying an account uid would undo that from the reporting side.
+The reporter refuses a `backbone:`-prefixed account id as a player key before it leaves the process, which is GameSpice Stats' rule and GameSpice User's reason: an operator must not be able to correlate their players across servers, and a report carrying an account uid would undo that from the reporting side.
 
 ## The points reporter
 
@@ -90,7 +90,7 @@ POST /api/integration/v1/points/events      (POINTS_WRITE)
 
 **Retries cannot pay twice.** Every event gets its eventId when it is reported (`<boot>:<seq>` unless the game passes its own, such as `match:round:seq`). Each batch is signed once and kept as the exact `{batch, sig}` pair until the site answers it, and a resend is those same bytes; the site deduplicates on (app, server, eventId). Only a network fault, a 5xx or a 429 is resent. Any other 4xx (`bad_batch`, 413 `batch_too_large`, `bad_signature`, `no_key`, `points_disabled`) would fail the same way for ever, so that batch is dropped, logged at ERROR and emitted as `batch_dropped`.
 
-**Signing is dot-cloud's.** The batch is signed with `DotCloudSignature.sign` (RSA PKCS#1 v1.5 over SHA-256, base64), found by class name at run time, so this addon still loads without dot-cloud; a host can set `signer` instead. Godot has no Ed25519, so the key the owner registers must be RSA, at least 2048 bits, with alg `RSA_SHA256`. `configure()` test-signs at boot, so a bad key fails there and not on the first kill.
+**Signing is GameSpice Cloud's.** The batch is signed with `DotCloudSignature.sign` (RSA PKCS#1 v1.5 over SHA-256, base64), found by class name at run time, so this addon still loads without GameSpice Cloud; a host can set `signer` instead. Godot has no Ed25519, so the key the owner registers must be RSA, at least 2048 bits, with alg `RSA_SHA256`. `configure()` test-signs at boot, so a bad key fails there and not on the first kill.
 
 **Server only.** `report()` refuses on a web build and on a multiplayer client. Clients never report and never send amounts.
 
@@ -102,8 +102,8 @@ POST /api/integration/v1/points/events      (POINTS_WRITE)
 
 ## Deliberately not here
 
-- **Art, toasts and a list screen.** `listing()` gives you rows; dot-ui gives you somewhere to put them. `icon_id` is an id this addon never resolves.
-- **Counting.** The game counts, or dot-stats does.
+- **Art, toasts and a list screen.** `listing()` gives you rows; GameSpice UI gives you somewhere to put them. `icon_id` is an id this addon never resolves.
+- **Counting.** The game counts, or GameSpice Stats does.
 - **"Gold implies silver".** Nothing enforces that a higher tier awards the lower ones. A game that wants it states both as rules; the alternative is an achievement whose condition is another achievement, and a store holding one and not the other then disagrees with itself.
 - **Cross-server totals.** A tracker is one deployment's. Two servers sharing progress share a `DotAchievementStore`, which is the seam that exists for it; `DotAchievementStoreSql` over one database is the one that ships.
 - **Anti-cheat.** A server that files a reading is trusted to have meant it. Nothing here can tell an earned kill from an invented one, and pretending otherwise would be worse than saying so.

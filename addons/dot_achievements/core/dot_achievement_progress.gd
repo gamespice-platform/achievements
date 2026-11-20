@@ -4,7 +4,7 @@ extends RefCounted
 ## One player's numbers and what they have earned.
 ##
 ## [b]Lifetime, not session.[/b] That distinction is the whole reason this holds its
-## own values rather than reading dot-stats': an achievement for a thousand kills is
+## own values rather than reading GameSpice Stats': an achievement for a thousand kills is
 ## about a thousand kills ever, and a session tracker knows about the last forty
 ## minutes. A tracker fed by session totals without a baseline awards nothing to a
 ## player who has been playing for a year.

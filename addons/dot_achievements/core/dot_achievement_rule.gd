@@ -10,7 +10,7 @@ extends Resource
 ## to be told about.
 ##
 ## [b][member merge] is the whole contract, and it is deliberately the same four
-## answers dot-stats gives.[/b] The one thing every party touching a number has to
+## answers GameSpice Stats gives.[/b] The one thing every party touching a number has to
 ## agree on is what happens when a new reading meets an old one, and if this addon
 ## answered it differently from the addon that produces the numbers, a lifetime
 ## counter would be silently replaced by a session one. The duplication is on

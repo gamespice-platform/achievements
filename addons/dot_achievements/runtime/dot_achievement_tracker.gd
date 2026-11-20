@@ -115,7 +115,7 @@ func _ready() -> void:
 ##
 ## Explicit because a tracker created through a [DotNodeRef] has already run
 ## [method _ready] by the time its host assigns a catalogue — the ordering that left
-## dot-server's audit log unopened in every default configuration.
+## GameSpice Server's audit log unopened in every default configuration.
 func start() -> DotResult:
 	if _started:
 		return DotResult.success(self)

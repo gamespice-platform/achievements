@@ -1,6 +1,6 @@
 [![Achievements - GameSpice addon](docs/banner.png)](https://moddingcommunity.com/a/36-gs-achievements)
 
-Achievements for Godot 4.7+, kept as data. You declare rules over per-player numbers once, and a dedicated server can check what a player has earned without loading any picture, icon or scene. Part of the [dot-*](https://github.com/gamespice-platform) family.
+Achievements for Godot 4.7+, kept as data. You declare rules over per-player numbers once, and a dedicated server can check what a player has earned without loading any picture, icon or scene. Part of the [GameSpice](https://github.com/gamespice-platform) family.
 
 It supports counters, bests, tiers, hidden and secret entries, progress that is never misreported, a pluggable store (memory, a file per player, or SQL), a batched reporter for the TMC back end, and a signed points event reporter for [**GameSpice**](https://gamespice.net) app points.
 
@@ -8,17 +8,17 @@ Why data? An achievement whose condition lives inside the code that awards it ca
 
 ## Install
 
-1. Copy `addons/dot_achievements/` and `addons/dot_core/` (from [dot-core](https://github.com/gamespice-platform/core)) into your project.
+1. Copy `addons/dot_achievements/` and `addons/dot_core/` (from [GameSpice Core](https://github.com/gamespice-platform/core)) into your project.
 2. Enable dot-achievements in *Project > Project Settings > Plugins*.
 
 Optional, and never named in the source:
 
 | Addon | What it adds |
 | --- | --- |
-| [dot-stats](https://github.com/gamespice-platform/stats) | The natural source of the numbers, bridged by `DotAchievementStatsLink`. |
-| [dot-auth](https://github.com/gamespice-platform/auth) | The back-end client for reporting. |
-| [dot-sql](https://github.com/gamespice-platform/sql) | SQLite, Postgres or MySQL/MariaDB storage. |
-| [dot-cloud](https://github.com/gamespice-platform/cloud) | The RSA signature `DotPointsReporter` signs its batches with. |
+| [GameSpice Stats](https://github.com/gamespice-platform/stats) | The natural source of the numbers, bridged by `DotAchievementStatsLink`. |
+| [GameSpice Auth](https://github.com/gamespice-platform/auth) | The back-end client for reporting. |
+| [GameSpice SQL](https://github.com/gamespice-platform/sql) | SQLite, Postgres or MySQL/MariaDB storage. |
+| [GameSpice Cloud](https://github.com/gamespice-platform/cloud) | The RSA signature `DotPointsReporter` signs its batches with. |
 
 ## Quick start
 
@@ -52,7 +52,7 @@ await tracker.end(player_key)           # saves
 | --- | --- |
 | `DotAchievementStoreMemory` | Tests and throwaway sessions. |
 | `DotAchievementStoreFile` | One file per player on disk. |
-| `DotAchievementStoreSql` | Servers that share progress. Needs a dot-sql driver. |
+| `DotAchievementStoreSql` | Servers that share progress. Needs a GameSpice SQL driver. |
 
 ```gdscript
 var store := DotAchievementStoreSql.new(driver)   # any dot-sql driver
@@ -71,7 +71,7 @@ link.stats = stats_tracker
 add_child(link)
 ```
 
-dot-stats reports a session total, but an achievement is about a lifetime. The link remembers a baseline and files only the difference, and treats a total that goes down as a new session.
+GameSpice Stats reports a session total, but an achievement is about a lifetime. The link remembers a baseline and files only the difference, and treats a total that goes down as a new session.
 
 ## Showing achievements
 
@@ -132,7 +132,7 @@ godot --headless --path . res://examples/achievements_selftest.tscn
 godot --headless --path . res://examples/points_selftest.tscn   # needs dot-cloud linked into addons/
 ```
 
-These run offline and exits non-zero on any failure. To test the SQL store against real SQLite, Postgres and MariaDB, link dot-sql into `addons/` and run:
+These run offline and exits non-zero on any failure. To test the SQL store against real SQLite, Postgres and MariaDB, link GameSpice SQL into `addons/` and run:
 
 ```bash
 ../dot-sql/tools/test_live.sh . res://examples/achievements_sql_live.tscn

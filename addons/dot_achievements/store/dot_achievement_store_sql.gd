@@ -1,7 +1,7 @@
 class_name DotAchievementStoreSql
 extends DotAchievementStore
 
-## Progress in real tables, in whichever SQL a dot-sql driver speaks.
+## Progress in real tables, in whichever SQL a GameSpice SQL driver speaks.
 ##
 ## [codeblock]
 ## var store := DotAchievementStoreSql.new(DotSqlDriverSqlite.new("user://achievements.db"))
@@ -14,7 +14,7 @@ extends DotAchievementStore
 ## note means by sharing a store. The tables are [DotAchievementSqlSchema]'s.
 ##
 ## [b]The driver is duck-typed[/b] — held untyped and asked for `query`, `batch`,
-## `upsert_sql`, `dialect` and `migrate` — so dot-achievements does not depend on dot-sql
+## `upsert_sql`, `dialect` and `migrate` — so GameSpice Achievements does not depend on GameSpice SQL
 ## and parses in a project without it.
 ##
 ## [b]A save writes the whole progress, as one batch.[/b] Every held number is upserted,
@@ -35,7 +35,7 @@ extends DotAchievementStore
 ## Emitted when a player's save finishes, for the next one waiting on it.
 signal _released(player: String)
 
-## Where statements go: a dot-sql driver, or anything shaped like one.
+## Where statements go: a GameSpice SQL driver, or anything shaped like one.
 var driver = null
 
 ## Table names, in case an operator already owns these or runs two games in one database.

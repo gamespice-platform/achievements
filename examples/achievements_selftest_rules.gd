@@ -236,7 +236,7 @@ func _test_stores() -> void:
 	DotPaths.remove_tree(directory)
 	var file := DotAchievementStoreFile.new(directory)
 
-	# Two keys that slugify identically. dot-timer shipped exactly this: surf_kitsune2
+	# Two keys that slugify identically. GameSpice Timer shipped exactly this: surf_kitsune2
 	# and surf_kitsune3 both became surf_kitsune_ and shared one records file.
 	var a := file.path_for("player one!")
 	var b := file.path_for("player one?")

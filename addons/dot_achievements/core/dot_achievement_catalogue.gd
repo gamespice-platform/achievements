@@ -135,7 +135,7 @@ func affected_by(stat: StringName) -> Array[DotAchievement]:
 	return empty
 
 
-## Every stat this catalogue reads. What a game hands dot-stats to declare.
+## Every stat this catalogue reads. What a game hands GameSpice Stats to declare.
 func watched_stats() -> Array[StringName]:
 	_ensure_indexed()
 
@@ -144,7 +144,7 @@ func watched_stats() -> Array[StringName]:
 		out.append(key as StringName)
 
 	# Not Array.sort(): Godot orders StringNames by their interned pointer, which is
-	# arbitrary between two processes. dot-net assigned wire ids from such a sort and
+	# arbitrary between two processes. GameSpice Net assigned wire ids from such a sort and
 	# two peers gave one message type two different ids.
 	out.sort_custom(func(a: StringName, b: StringName) -> bool:
 		return String(a) < String(b))
@@ -152,7 +152,7 @@ func watched_stats() -> Array[StringName]:
 	return out
 
 
-## How a stat should be merged, for a game wiring this to dot-stats.
+## How a stat should be merged, for a game wiring this to GameSpice Stats.
 ##
 ## Returns [code]-1[/code] when nothing reads the stat. A validated catalogue cannot
 ## disagree with itself about a merge — [method validate] refuses one that does.

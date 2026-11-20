@@ -12,7 +12,7 @@ const CHECKS := 58
 const JOURNAL := "user://points_selftest/queue.jsonl"
 
 
-## A stand-in for dot-auth's DotBackboneClient. [member fail_with] fails the next posts.
+## A stand-in for GameSpice Auth's DotBackboneClient. [member fail_with] fails the next posts.
 class FakeBackbone extends RefCounted:
 	var calls: Array[Dictionary] = []
 	var fail_with: DotError = null

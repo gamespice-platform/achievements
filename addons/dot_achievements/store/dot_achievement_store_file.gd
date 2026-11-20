@@ -11,7 +11,7 @@ extends DotAchievementStore
 ## [code]../../[/code] away from writing outside its directory. [DotPaths.slugify]
 ## plus a hash of the whole key is what makes the name both safe and unique — the
 ## slug alone is not, because two different keys can slugify to the same string, and
-## dot-timer shipped exactly that: [code]surf_kitsune2[/code] and
+## GameSpice Timer shipped exactly that: [code]surf_kitsune2[/code] and
 ## [code]surf_kitsune3[/code] both became [code]surf_kitsune_[/code] and shared one
 ## records file.
 

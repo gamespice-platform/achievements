@@ -8,5 +8,5 @@ The reporter's `define()` and `flush()` existed and nothing called either, so ev
 
 ## Cross-repo
 
-- **A slug that was not unique** was dot-timer's: two map names that slugged alike shared one records file. This addon's file store adds a hash of the whole key for that reason.
-- **Reporters sending their own shape** were dot-leaderboard's and dot-stats': each would have had every request refused by the backbone schema. Read the receiving side before writing a reporter.
+- **A slug that was not unique** was GameSpice Timer's: two map names that slugged alike shared one records file. This addon's file store adds a hash of the whole key for that reason.
+- **Reporters sending their own shape** were GameSpice Leaderboard's and GameSpice Stats': each would have had every request refused by the backbone schema. Read the receiving side before writing a reporter.

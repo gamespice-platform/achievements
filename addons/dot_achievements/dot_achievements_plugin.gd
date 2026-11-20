@@ -1,7 +1,7 @@
 @tool
 extends EditorPlugin
 
-## Editor entry point for dot-achievements. Registers inspector types only.
+## Editor entry point for GameSpice Achievements. Registers inspector types only.
 ##
 ## No autoloads. A process running a server and a client holds two trackers, and an
 ## autoload could be neither twice.

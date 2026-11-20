@@ -21,9 +21,9 @@ extends Node
 ##
 ## Every event gets its eventId when it is reported, and each batch is signed once and
 ## resent byte-identical until the site answers, so a retry is never a second payment:
-## the site deduplicates on (app, server, eventId). Signing goes through dot-cloud's
+## the site deduplicates on (app, server, eventId). Signing goes through GameSpice Cloud's
 ## [code]DotCloudSignature.sign[/code] (RSA-SHA256), reached by name so this addon still
-## loads without dot-cloud; [member signer] replaces it.
+## loads without GameSpice Cloud; [member signer] replaces it.
 ##
 ## Unsent events survive a crash: with [member DotPointsReporterConfig.persist_queue] on
 ## (the default) every event, sealed batch and answer is appended to a journal file, and
@@ -42,7 +42,7 @@ const MAX_COUNT := 2147483647
 const META_KEYS := ["humans", "vsBot"]
 
 ## The backbone client: any object with [code]post_integration(String, Dictionary)[/code],
-## dot-auth's DotBackboneClient in practice. Found under [member client_service] if unset.
+## GameSpice Auth's DotBackboneClient in practice. Found under [member client_service] if unset.
 var client: Object = null
 var client_service: StringName = &"dot_backbone_client"
 

@@ -1,10 +1,10 @@
 class_name DotAchievementStatsLink
 extends Node
 
-## Feeds a [DotAchievementTracker] from a dot-stats tracker, without naming one.
+## Feeds a [DotAchievementTracker] from a GameSpice Stats tracker, without naming one.
 ##
 ## [b]This class exists because of one subtlety, and it is the kind that ships.[/b]
-## dot-stats' [code]recorded[/code] signal carries the player's [i]session[/i] total,
+## GameSpice Stats' [code]recorded[/code] signal carries the player's [i]session[/i] total,
 ## not the reading that caused it — its whole design is that a session is what a
 ## server counts and a delta is what it reports. An achievement is about a lifetime.
 ## Wiring the signal straight into [method DotAchievementTracker.record] therefore
@@ -12,7 +12,7 @@ extends Node
 ## after the second kill, six after the third, ten after the fourth.
 ##
 ## So this holds the last session value it saw per player and stat, and files the
-## difference. A value that goes [i]down[/i] is a new session — dot-stats begins a
+## difference. A value that goes [i]down[/i] is a new session — GameSpice Stats begins a
 ## player at zero — and the whole value is filed rather than a negative one.
 ##
 ## [codeblock]
@@ -36,7 +36,7 @@ extends Node
 var tracker: DotAchievementTracker = null
 
 ## Anything with a [code]recorded(player_id, stat_id, value)[/code] signal.
-## dot-stats' [code]DotStatsTracker[/code], in practice, which is not named here.
+## GameSpice Stats' [code]DotStatsTracker[/code], in practice, which is not named here.
 var stats: Object = null
 
 ## Registry name to find one under when [member stats] is not set.

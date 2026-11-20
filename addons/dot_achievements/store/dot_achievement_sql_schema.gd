@@ -11,15 +11,15 @@ extends RefCounted
 ## in the table and parsing it. A row per held number and a row per unlock is what a site
 ## page, a rarity figure and an operator's own query all want, and it costs nothing here.
 ##
-## [b]The tables are plain data, rendered by dot-sql.[/b] [method values_spec] and
-## [method unlocks_spec] are [Dictionary] specs a dot-sql driver turns into DDL for its own
-## dialect. This file names no dot-sql class, so dot-achievements still parses in a project
-## without it. Placeholders are [code]?[/code] in every dialect — dot-sql's contract.
+## [b]The tables are plain data, rendered by GameSpice SQL.[/b] [method values_spec] and
+## [method unlocks_spec] are [Dictionary] specs a GameSpice SQL driver turns into DDL for its own
+## dialect. This file names no GameSpice SQL class, so GameSpice Achievements still parses in a project
+## without it. Placeholders are [code]?[/code] in every dialect — GameSpice SQL's contract.
 
 const DEFAULT_VALUES_TABLE := "dot_achievement_values"
 const DEFAULT_UNLOCKS_TABLE := "dot_achievement_unlocks"
 
-## The component the schema version is recorded under in dot-sql's migration table,
+## The component the schema version is recorded under in GameSpice SQL's migration table,
 ## suffixed with the values table so two stores in one database keep separate versions.
 ## Bumped by adding a step to [method migration_steps], never by editing one.
 const MIGRATION_COMPONENT := "dot_achievements"
@@ -66,7 +66,7 @@ static func unlocks_spec(table: String = DEFAULT_UNLOCKS_TABLE) -> Dictionary:
 	}
 
 
-## Every schema change, in order, for dot-sql's migrator. Step N brings version N to N+1.
+## Every schema change, in order, for GameSpice SQL's migrator. Step N brings version N to N+1.
 static func migration_steps(
 	values: String = DEFAULT_VALUES_TABLE, unlocks: String = DEFAULT_UNLOCKS_TABLE
 ) -> Array:
@@ -130,7 +130,7 @@ static func _number(value: Variant) -> Variant:
 	return null
 
 
-## A dialect's name, for logs and [code]describe()[/code]. The integers are dot-sql's.
+## A dialect's name, for logs and [code]describe()[/code]. The integers are GameSpice SQL's.
 static func dialect_name(dialect: int) -> String:
 	match dialect:
 		0: return "sqlite"

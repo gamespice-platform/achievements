@@ -5,11 +5,11 @@ extends Resource
 ## One thing a player can earn, as a document that can be checked without loading
 ## anything.
 ##
-## The same doctrine dot-loadout and dot-user-avatar are built on, for the same
+## The same doctrine GameSpice Loadout and GameSpice User Avatar are built on, for the same
 ## reason: an achievement is a set of ids and numbers, so a server can validate a
 ## whole catalogue, decide whether somebody has earned something, and report it,
 ## **without ever loading a mesh, an icon or a scene**. [member icon_id] is an id a
-## game resolves however it likes — through dot-cloud, out of its own build, or not
+## game resolves however it likes — through GameSpice Cloud, out of its own build, or not
 ## at all on a dedicated server, which has no business loading art.
 
 @export_group("Identity")
@@ -25,7 +25,7 @@ extends Resource
 ## For grouping in a list. Free-form.
 @export var category: StringName = &""
 
-## An id the game resolves to art. dot-achievements never loads it.
+## An id the game resolves to art. GameSpice Achievements never loads it.
 @export var icon_id: StringName = &""
 
 @export_group("Value")
