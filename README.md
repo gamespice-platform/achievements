@@ -1,4 +1,4 @@
-[![Achievements - GameSpice addon](docs/banner.png)](https://moddingcommunity.com/a/233-dot-achievements)
+[![Achievements - GameSpice addon](docs/banner.png)](https://moddingcommunity.com/a/36-gs-achievements)
 
 Achievements for Godot 4.7+, kept as data. You declare rules over per-player numbers once, and a dedicated server can check what a player has earned without loading any picture, icon or scene. Part of the [dot-*](https://github.com/gamespice-platform) family.
 
