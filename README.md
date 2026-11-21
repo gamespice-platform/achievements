@@ -8,7 +8,7 @@ Why data? An achievement whose condition lives inside the code that awards it ca
 
 ## Install
 
-1. Copy `addons/dot_achievements/` and `addons/dot_core/` (from [GameSpice Core](https://github.com/gamespice-platform/core)) into your project.
+1. Copy `addons/dot_achievements/` `addons/dot_core/` (from [GameSpice Core](https://github.com/gamespice-platform/core)) and `addons/dot_save/` (from [GameSpice Save](https://github.com/gamespice-platform/save)) into your project.
 2. Enable dot-achievements in *Project > Project Settings > Plugins*.
 
 Optional, and never named in the source:

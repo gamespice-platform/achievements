@@ -18,18 +18,20 @@ extends DotAchievementStore
 ## Where the files go.
 var directory: String = "user://dot_achievements"
 
-## Written atomically. A crash mid-write leaves the old file or the new one and never
+## Written atomically, by [DotSaveStoreFile] (GameSpice Save), which also flushes a browser's IndexedDB. A crash mid-write leaves the old file or the new one and never
 ## half of one — which for a progress file is indistinguishable from a player losing
 ## everything.
 var atomic: bool = true
+
+var _files: DotSaveStoreFile
 
 
 func _init(p_directory: String = "user://dot_achievements") -> void:
 	directory = p_directory
 
 
-## The file a player's progress lives in.
-func path_for(player: String) -> String:
+## The file name, without its folder or ending, a player's progress lives in.
+func key_for(player: String) -> String:
 	var slug := DotPaths.slugify(player, 40)
 	if slug == "":
 		slug = "player"
@@ -39,7 +41,23 @@ func path_for(player: String) -> String:
 	# and two players must never share one.
 	var digest := DotHash.sha256_text(player).substr(0, 16)
 
-	return "%s/%s-%s.json" % [directory, slug, digest]
+	return "%s-%s" % [slug, digest]
+
+
+## The file a player's progress lives in.
+func path_for(player: String) -> String:
+	return files().path_for(key_for(player))
+
+
+## The file store under this one: the folder, the [code].json[/code] ending, and the atomic switch as they stand now. The key is derived above, so nothing is checked on it.
+func files() -> DotSaveStoreFile:
+	if _files == null:
+		_files = DotSaveStoreFile.new()
+		_files.suffix = ".json"
+		_files.key_check = func(key: String) -> bool: return not key.is_empty()
+	_files.directory = directory
+	_files.atomic = atomic
+	return _files
 
 
 func _load_progress(player: String) -> DotResult:
@@ -65,16 +83,10 @@ func _load_progress(player: String) -> DotResult:
 
 
 func _save_progress(player: String, progress: DotAchievementProgress) -> DotResult:
-	var written := DotPaths.write_json(
-		path_for(player), progress.to_dictionary(), true, atomic
-	)
+	var written := files().write(key_for(player), JSON.stringify(progress.to_dictionary(), "\t"))
 
 	if not written.ok:
 		return written.wrap("Could not save achievement progress.")
 
-	# user:// on the web is an IndexedDB mirror that needs an explicit flush. Without
-	# it the file exists in the tab and not in the browser's storage, and the first
-	# reload loses everything the player earned.
-	DotWeb.sync_filesystem()
-
+	# The browser's IndexedDB flush is done by the file store.
 	return DotResult.success(1)
