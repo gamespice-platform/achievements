@@ -17,7 +17,7 @@ extends Node
 ## [/codeblock]
 ##
 ## [b]A player must be begun before anything can be filed for them, and that is not
-## an oversight.[/b] dot-stats begins a player implicitly, which is right there: a
+## an oversight.[/b] gs-stats begins a player implicitly, which is right there: a
 ## session tracker starting from zero is starting from the truth. Here it would mean
 ## evaluating a returning player's lifetime achievements against a blank slate — so
 ## a player who has played for a year would unlock their first-kill achievement
@@ -26,7 +26,7 @@ extends Node
 
 const CHANNEL := "achievements"
 
-const SERVICE := &"dot_achievements"
+const SERVICE := &"gs_achievements"
 
 ## Somebody earned something. Fired once per achievement per player, ever.
 signal unlocked(player: String, achievement: GSAchievement)
@@ -82,7 +82,7 @@ signal save_failed(player: String, error: GSError)
 @export var report_app: String = ""
 
 ## Where the default file store keeps progress (user:// is already per game).
-@export var store_directory: String = "user://dot_achievements"
+@export var store_directory: String = "user://gs_achievements"
 
 ## Where progress lives. Left null, start() makes a [GSAchievementStoreFile] in
 ## [member store_directory]; assign [GSAchievementStoreMemory] for throwaway runs.

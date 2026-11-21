@@ -40,7 +40,7 @@ var tracker: GSAchievementTracker = null
 var stats: Object = null
 
 ## Registry name to find one under when [member stats] is not set.
-var stats_service: StringName = &"dot_stats_tracker"
+var stats_service: StringName = &"gs_stats_tracker"
 
 ## stats key -> achievement key, for a game that files stats and records under different keys. A reading
 ## (and its baseline, so [method forget] takes the achievement key) under a listed key is filed under the

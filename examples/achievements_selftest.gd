@@ -1,6 +1,6 @@
 extends "res://examples/achievements_selftest_rules.gd"
 
-## Exercises dot-achievements with no backbone, no dot-stats and no art.
+## Exercises gs-achievements with no backbone, no gs-stats and no art.
 ##
 ## The stats tracker is faked at the one seam that matters — a
 ## [code]recorded(player, stat, session_value)[/code] signal — because that signal's
@@ -80,7 +80,7 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	_line("dot-achievements self-test")
+	_line("gs-achievements self-test")
 	_line("")
 
 	_test_rules()
@@ -297,7 +297,7 @@ func _test_tracker_refusals() -> void:
 
 	var tracker := _tracker()
 
-	# The one that matters. dot-stats begins a player implicitly and is right to;
+	# The one that matters. gs-stats begins a player implicitly and is right to;
 	# here it would evaluate a returning player's lifetime achievements against a
 	# blank slate, award their first-kill achievement again, and write it back over
 	# the real record.
@@ -375,7 +375,7 @@ func _test_listing() -> void:
 # --- The GameSpice Stats bridge --------------------------------------------------
 
 func _test_stats_link() -> void:
-	_section("the dot-stats bridge")
+	_section("the gs-stats bridge")
 
 	var tracker := _tracker()
 	await tracker.begin("ada")

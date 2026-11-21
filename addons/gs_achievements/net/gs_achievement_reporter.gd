@@ -61,7 +61,7 @@ const ACCOUNT_PREFIX := "backbone:"
 var client: Object = null
 
 ## Registry name to find one under when [member client] is not set.
-var client_service: StringName = &"dot_backbone_client"
+var client_service: StringName = &"gs_backbone_client"
 
 ## Unlocks per request. Matched to what a batch endpoint should reasonably cap at.
 var batch_limit: int = 50

@@ -16,13 +16,13 @@ extends RefCounted
 ## dialect. This file names no GameSpice SQL class, so GameSpice Achievements still parses in a project
 ## without it. Placeholders are [code]?[/code] in every dialect — GameSpice SQL's contract.
 
-const DEFAULT_VALUES_TABLE := "dot_achievement_values"
-const DEFAULT_UNLOCKS_TABLE := "dot_achievement_unlocks"
+const DEFAULT_VALUES_TABLE := "gs_achievement_values"
+const DEFAULT_UNLOCKS_TABLE := "gs_achievement_unlocks"
 
 ## The component the schema version is recorded under in GameSpice SQL's migration table,
 ## suffixed with the values table so two stores in one database keep separate versions.
 ## Bumped by adding a step to [method migration_steps], never by editing one.
-const MIGRATION_COMPONENT := "dot_achievements"
+const MIGRATION_COMPONENT := "gs_achievements"
 
 const VALUE_COLUMNS := ["player", "stat", "amount", "updated_at"]
 const UNLOCK_COLUMNS := ["player", "achievement", "unlocked_at"]

@@ -8,8 +8,8 @@ Why data? An achievement whose condition lives inside the code that awards it ca
 
 ## Install
 
-1. Copy `addons/dot_achievements/` `addons/dot_core/` (from [GameSpice Core](https://github.com/gamespice-platform/core)) and `addons/dot_save/` (from [GameSpice Save](https://github.com/gamespice-platform/save)) into your project.
-2. Enable dot-achievements in *Project > Project Settings > Plugins*.
+1. Copy `addons/gs_achievements/` `addons/gs_core/` (from [GameSpice Core](https://github.com/gamespice-platform/core)) and `addons/gs_save/` (from [GameSpice Save](https://github.com/gamespice-platform/save)) into your project.
+2. Enable gs-achievements in *Project > Project Settings > Plugins*.
 
 Optional, and never named in the source:
 
@@ -55,12 +55,12 @@ await tracker.end(player_key)           # saves
 | `GSAchievementStoreSql` | Servers that share progress. Needs a GameSpice SQL driver. |
 
 ```gdscript
-var store := GSAchievementStoreSql.new(driver)   # any dot-sql driver
+var store := GSAchievementStoreSql.new(driver)   # any gs-sql driver
 await store.open()                                # creates or migrates its two tables
 tracker.store = store
 ```
 
-The SQL store keeps one row per held number and one row per unlock (`dot_achievement_values` and `dot_achievement_unlocks`; both table names are configurable). That makes "how many players earned this" a query. Saves are batched and serialised per player.
+The SQL store keeps one row per held number and one row per unlock (`gs_achievement_values` and `gs_achievement_unlocks`; both table names are configurable). That makes "how many players earned this" a query. Saves are batched and serialised per player.
 
 ## With Stats
 
@@ -91,7 +91,7 @@ var cfg := GSPointsReporterConfig.new()
 cfg.app_id = 12
 cfg.server_id = 34
 cfg.private_key_path = "/etc/mygame/points.pem"
-var loaded := cfg.load_layered("")   # DOT_POINTS_* and --points-* override
+var loaded := cfg.load_layered("")   # GS_POINTS_* and --points-* override
 var points := GSPointsReporter.new()
 add_child(points)
 var configured := points.configure(cfg)   # fails loudly on a bad config or key
@@ -112,7 +112,7 @@ The app owner registers the server's public key once: `POST /api/app/v1/apps/:id
 
 ## Site catalogue file
 
-You can export a catalogue as the site's `dot-achievement-defs` JSON, so the site owner can import it from the dashboard. Run `tools/export_site_defs.gd` from your game project:
+You can export a catalogue as the site's `gs-achievement-defs` JSON, so the site owner can import it from the dashboard. Run `tools/export_site_defs.gd` from your game project:
 
 | Option | Meaning |
 | --- | --- |
@@ -129,13 +129,13 @@ You can export a catalogue as the site's `dot-achievement-defs` JSON, so the sit
 ```bash
 godot --headless --path . --import
 godot --headless --path . res://examples/achievements_selftest.tscn
-godot --headless --path . res://examples/points_selftest.tscn   # needs dot-cloud linked into addons/
+godot --headless --path . res://examples/points_selftest.tscn   # needs gs-cloud linked into addons/
 ```
 
 These run offline and exits non-zero on any failure. To test the SQL store against real SQLite, Postgres and MariaDB, link GameSpice SQL into `addons/` and run:
 
 ```bash
-../dot-sql/tools/test_live.sh . res://examples/achievements_sql_live.tscn
+../gs-sql/tools/test_live.sh . res://examples/achievements_sql_live.tscn
 ```
 
 ## Status

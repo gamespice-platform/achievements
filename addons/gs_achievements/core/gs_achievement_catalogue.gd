@@ -208,7 +208,7 @@ func to_dictionary() -> Dictionary:
 	return {"version": 1, "achievements": rows}
 
 
-## The site's `dot-achievement-defs` document; [param game] 0 leaves the app id out.
+## The site's `gs-achievement-defs` document; [param game] 0 leaves the app id out.
 func to_site_defs(game: int = 0) -> Dictionary:
 	var rows: Array = []
 	for a in achievements:
@@ -224,7 +224,7 @@ func to_site_defs(game: int = 0) -> Dictionary:
 			"hidden": a.hidden, "secret": a.secret, "series": String(a.series), "tier": a.tier,
 			"requireAll": a.require_all, "rules": rules,
 		})
-	var out := {"format": "dot-achievement-defs", "version": 1}
+	var out := {"format": "gs-achievement-defs", "version": 1}
 	if game > 0:
 		out["game"] = game
 	out["achievements"] = rows

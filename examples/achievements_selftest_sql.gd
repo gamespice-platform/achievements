@@ -43,18 +43,18 @@ func _test_sql_store() -> void:
 	var opened: GSResult = await store.open()
 	_check(opened.ok, "the store opens and creates its schema")
 	_check(
-		driver.matching("CREATE TABLE IF NOT EXISTS dot_achievement_values").size() == 1
-			and driver.matching("CREATE TABLE IF NOT EXISTS dot_achievement_unlocks").size() == 1,
+		driver.matching("CREATE TABLE IF NOT EXISTS gs_achievement_values").size() == 1
+			and driver.matching("CREATE TABLE IF NOT EXISTS gs_achievement_unlocks").size() == 1,
 		"both tables are created"
 	)
 	_check(
-		driver.matching("CREATE INDEX IF NOT EXISTS dot_achievement_unlocks_earned_idx").size() == 1,
+		driver.matching("CREATE INDEX IF NOT EXISTS gs_achievement_unlocks_earned_idx").size() == 1,
 		"with the index that answers 'how many have earned this'"
 	)
-	var recorded := driver.matching("INSERT INTO dot_sql_migrations")
+	var recorded := driver.matching("INSERT INTO gs_sql_migrations")
 	_check(
 		recorded.size() == 1
-			and (recorded[0]["params"] as Array)[0] == "dot_achievements:dot_achievement_values",
+			and (recorded[0]["params"] as Array)[0] == "gs_achievements:gs_achievement_values",
 		"and its schema version recorded under its own component"
 	)
 
@@ -114,7 +114,7 @@ func _test_sql_save() -> void:
 	_check(saved.ok and sqls.size() == 5, "a save is one value, two unlocks and two deletes (%d)" % sqls.size())
 	if sqls.size() == 5:
 		_check(
-			sqls[0].contains("INSERT INTO dot_achievement_values") and sqls[0].contains("DO UPDATE SET"),
+			sqls[0].contains("INSERT INTO gs_achievement_values") and sqls[0].contains("DO UPDATE SET"),
 			"a held number is upserted"
 		)
 		_check(
@@ -122,16 +122,16 @@ func _test_sql_save() -> void:
 			"bound as player, stat, amount"
 		)
 		_check(
-			sqls[1].contains("INSERT INTO dot_achievement_unlocks") and sqls[1].contains("DO NOTHING"),
+			sqls[1].contains("INSERT INTO gs_achievement_unlocks") and sqls[1].contains("DO NOTHING"),
 			"an unlock is inserted if absent, so the time it was earned is never rewritten"
 		)
 		_check(
-			sqls[3].begins_with("DELETE FROM dot_achievement_unlocks WHERE player = ? AND achievement NOT IN (?, ?)")
+			sqls[3].begins_with("DELETE FROM gs_achievement_unlocks WHERE player = ? AND achievement NOT IN (?, ?)")
 				and (driver.statements[3]["params"] as Array) == ["ada", "k10", "fast"],
 			"then what the progress no longer holds is deleted, the kept ids bound"
 		)
 		_check(
-			sqls[4].begins_with("DELETE FROM dot_achievement_values")
+			sqls[4].begins_with("DELETE FROM gs_achievement_values")
 				and not (driver.statements[4]["params"] as Array).has("bad"),
 			"deletes last, and a non-finite number is left out rather than costing the save"
 		)
@@ -143,8 +143,8 @@ func _test_sql_save() -> void:
 	driver.clear()
 	await store.save_progress("ada", revoked)
 	_check(
-		driver.matching("DELETE FROM dot_achievement_unlocks WHERE player = ?").size() == 1
-			and not str(driver.matching("DELETE FROM dot_achievement_unlocks")[0]["sql"]).contains("NOT IN"),
+		driver.matching("DELETE FROM gs_achievement_unlocks WHERE player = ?").size() == 1
+			and not str(driver.matching("DELETE FROM gs_achievement_unlocks")[0]["sql"]).contains("NOT IN"),
 		"a progress with nothing unlocked deletes every unlock: a revocation reaches the table"
 	)
 
@@ -154,7 +154,7 @@ func _test_sql_save() -> void:
 	await mysql_store.open()
 	mysql.clear()
 	await mysql_store.save_progress("ada", saving)
-	var mysql_unlock := mysql.matching("INSERT INTO dot_achievement_unlocks")
+	var mysql_unlock := mysql.matching("INSERT INTO gs_achievement_unlocks")
 	_check(
 		mysql_unlock.size() == 2 and str(mysql_unlock[0]["sql"]).contains("ON DUPLICATE KEY UPDATE player = player"),
 		"on MySQL the insert-if-absent is a no-op update, not INSERT IGNORE"
@@ -181,7 +181,7 @@ func _test_sql_failures() -> void:
 	newer.answers = {"SELECT version FROM": [{"version": 99}]}
 	var refused: GSResult = await GSAchievementStoreSql.new(newer).open()
 	_check(
-		not refused.ok and newer.matching("CREATE TABLE IF NOT EXISTS dot_achievement_values").is_empty(),
+		not refused.ok and newer.matching("CREATE TABLE IF NOT EXISTS gs_achievement_values").is_empty(),
 		"a database from a newer build is refused, and nothing is created in it"
 	)
 
@@ -200,14 +200,14 @@ func _test_sql_failures() -> void:
 	await slow_store.save_progress("ada", racing)
 	var order: Array = slow.statements.map(func(st): return str(st["sql"]).left(34))
 	var serial := [
-		"INSERT INTO dot_achievement_unlock", "DELETE FROM dot_achievement_unlock", "DELETE FROM dot_achievement_values",
-		"INSERT INTO dot_achievement_unlock", "INSERT INTO dot_achievement_unlock", "DELETE FROM dot_achievement_unlock", "DELETE FROM dot_achievement_values",
+		"INSERT INTO gs_achievement_unlock", "DELETE FROM gs_achievement_unlock", "DELETE FROM gs_achievement_values",
+		"INSERT INTO gs_achievement_unlock", "INSERT INTO gs_achievement_unlock", "DELETE FROM gs_achievement_unlock", "DELETE FROM gs_achievement_values",
 	]
 	_check(
 		order == serial,
 		"two saves of one player run one after the other, with nothing interleaved"
 	)
-	var last_delete := slow.matching("DELETE FROM dot_achievement_unlocks")
+	var last_delete := slow.matching("DELETE FROM gs_achievement_unlocks")
 	_check(
 		last_delete.size() == 2 and (last_delete[1]["params"] as Array) == ["ada", "k10", "fast"],
 		"and the second, which runs last, writes the newest state"

@@ -4,7 +4,7 @@ Why GameSpice Achievements is shaped the way it is, and why the obvious alternat
 
 ## What this is, and what it is not
 
-A **stat** is a number about a player; dot-stats has those. An **achievement** is a condition over one or more of them, plus what it is called and what it is worth. Nothing here counts anything: the game counts, and this decides.
+A **stat** is a number about a player; gs-stats has those. An **achievement** is a condition over one or more of them, plus what it is called and what it is worth. Nothing here counts anything: the game counts, and this decides.
 
 The two addons do not import each other, and this one carries its own values rather than GameSpice Stats' `GSStatsValues`, for the family reason (naming an absent `class_name` fails to parse) and for a real one: these are **lifetime** numbers and GameSpice Stats' are a **session**.
 
@@ -22,7 +22,7 @@ A game that files stats under one key and achievements under another sets `link.
 
 ## A player must be begun
 
-`GSAchievementTracker.record` refuses a player who has not been loaded, with `CODE_STATE`. dot-stats begins a player implicitly and is right to: a session tracker starting from zero is starting from the truth. Here it would evaluate a returning player's lifetime achievements against a blank slate, awarding their first-kill achievement again and then writing that record back over the real one.
+`GSAchievementTracker.record` refuses a player who has not been loaded, with `CODE_STATE`. gs-stats begins a player implicitly and is right to: a session tracker starting from zero is starting from the truth. Here it would evaluate a returning player's lifetime achievements against a blank slate, awarding their first-kill achievement again and then writing that record back over the real one.
 
 For the same reason **a store that cannot read is a failure, not an empty player**. Handing back a fresh `GSAchievementProgress` when a database is down gives a returning player a blank account and then saves it. And **a failed save leaves the dirty flag set**: clearing it is how a store that was briefly unavailable turns into progress quietly discarded at the next autosave.
 
@@ -45,7 +45,7 @@ A reading arrives and something has to decide which achievements it could have m
 - **Comparisons carry an epsilon.** A value summed a thousand times is not bit-identical to the same value summed in another order.
 - **`merge_value` takes `has_current`.** A first reading of 12 seconds on a `LOWEST` stat is 12, not `min(12, 0.0)`: the bug that makes every player's best time zero the day the feature ships.
 - **The stored points total is recounted on load.** It is a cache, and a catalogue whose values changed since the file was written makes it wrong.
-- **The file store's name is a slug plus a hash of the whole key.** The slug alone is not unique: dot-timer once shipped exactly that, and two map names differing only in their last character shared one records file. The hash is also what stops a key of `../../etc/passwd` writing outside the directory.
+- **The file store's name is a slug plus a hash of the whole key.** The slug alone is not unique: gs-timer once shipped exactly that, and two map names differing only in their last character shared one records file. The hash is also what stops a key of `../../etc/passwd` writing outside the directory.
 - **The tracker defaults to a memory store.** A default that silently starts writing a file per player under `user://` on a dedicated server is one nobody notices until the disk is full.
 - **`GSAchievementStoreFile` calls `GSWeb.sync_filesystem()` after every write**, because `user://` in a browser is an IndexedDB mirror. Otherwise nothing here is platform-specific: no socket and no thread.
 
@@ -96,7 +96,7 @@ POST /api/integration/v1/points/events      (POINTS_WRITE)
 
 **No silent limits.** `max_batch_events` and `max_pending_events` are 0 for unlimited; negative values fail `validate()`. A full queue makes `report()` fail with `CODE_STATE` and an ERROR log, and nothing already held is dropped. Keep `max_batch_events` at or under the site's `appPoints.maxEventsPerBatch`.
 
-**Unsent events survive a crash.** With `persist_queue` on (the default) every queued event, sealed batch and answer is appended to a journal, one JSON line each, at `queue_path` (default `user://dot_points/queue-<app>-<server>.jsonl`). The next `configure()` on the same file queues what was never answered ahead of anything new: a sealed batch as the same signed bytes, an unsealed event with the same eventId, so the site's (app, server, eventId) dedup makes a replay harmless. Appending keeps `report()` cheap while the site is away; the file is rewritten at load and removed once nothing is pending. A torn last line from a crash mid-write is skipped. A journal that cannot be written is an ERROR once and `journal_error` in `describe()`; the events are still held in memory and sent. Give each server process its own file.
+**Unsent events survive a crash.** With `persist_queue` on (the default) every queued event, sealed batch and answer is appended to a journal, one JSON line each, at `queue_path` (default `user://gs_points/queue-<app>-<server>.jsonl`). The next `configure()` on the same file queues what was never answered ahead of anything new: a sealed batch as the same signed bytes, an unsealed event with the same eventId, so the site's (app, server, eventId) dedup makes a replay harmless. Appending keeps `report()` cheap while the site is away; the file is rewritten at load and removed once nothing is pending. A torn last line from a crash mid-write is skipped. A journal that cannot be written is an ERROR once and `journal_error` in `describe()`; the events are still held in memory and sent. Give each server process its own file.
 
 **Registering the key is an owner step.** The app owner registers the server's public key (SPKI PEM, the `public` half of `GSCloudSignature.generate_keypair()`) with `POST /api/app/v1/apps/:id/points/keys` and `{serverId, alg: "RSA_SHA256", publicKey}`. Registering it automatically at enrolment is not built. The private key stays on the server: give it by `private_key_path`, or by `private_key_pem` from code. `private_key_pem` is a sensitive key and is refused from the environment and the command line.
 

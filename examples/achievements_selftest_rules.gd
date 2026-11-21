@@ -92,7 +92,7 @@ func _test_catalogue() -> void:
 	var valid := catalogue.validate()
 	_check(valid.ok, "a catalogue validates")
 	var site := catalogue.to_site_defs()
-	_check(site["format"] == "dot-achievement-defs" and site["version"] == 1, "the site document names its format and version")
+	_check(site["format"] == "gs-achievement-defs" and site["version"] == 1, "the site document names its format and version")
 	_check(not site.has("game") and catalogue.to_site_defs(7)["game"] == 7, "the app id is left out unless asked for")
 	var first: Dictionary = (site["achievements"] as Array)[0]
 	_check(first.has("key") and first.has("requireAll") and (first["rules"] as Array).size() > 0, "an exported achievement carries its key and rules")
@@ -230,7 +230,7 @@ func _test_stores() -> void:
 		"a store hands out copies: two callers holding one object is two writers"
 	)
 
-	var directory := "user://dot_achievements_selftest"
+	var directory := "user://gs_achievements_selftest"
 	# From nothing, every run: "a player with no file is a fresh player" and every
 	# save-then-load below mean nothing against a directory the last run left full.
 	GSPaths.remove_tree(directory)
@@ -305,7 +305,7 @@ func _catalogue() -> GSAchievementCatalogue:
 
 func _test_default_store() -> void:
 	_section("default store")
-	var dir := "user://dot_achievements_default_selftest"
+	var dir := "user://gs_achievements_default_selftest"
 	GSPaths.remove_tree(dir)
 	var tracker := GSAchievementTracker.new()
 	tracker.register_as = &""

@@ -1,6 +1,6 @@
 extends "res://examples/achievements_selftest_sql.gd"
 
-## Exercises GSPointsReporter against a fake backbone and a real dot-cloud signature.
+## Exercises GSPointsReporter against a fake backbone and a real gs-cloud signature.
 ## Extends the SQL section's file only for its check harness.
 ##
 ## [codeblock]
@@ -39,7 +39,7 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	_line("dot-achievements points reporter self-test")
+	_line("gs-achievements points reporter self-test")
 
 	var pair := GSCloudSignature.generate_keypair(2048)
 	if not pair.ok:

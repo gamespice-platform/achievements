@@ -2,7 +2,7 @@ class_name GSPointsReporterConfig
 extends GSConfig
 
 ## Settings for [GSPointsReporter]. Layers, weakest first: defaults < a JSON file <
-## `DOT_POINTS_*` < `--points-<key>=`. The private key itself is never read from the
+## `GS_POINTS_*` < `--points-<key>=`. The private key itself is never read from the
 ## environment or the command line; point [member private_key_path] at a file instead.
 
 ## The Gamespice app id the events are credited under. Required.
@@ -34,7 +34,7 @@ extends GSConfig
 ## for a sealed batch, the same signed bytes, so the site never pays twice).
 @export var persist_queue: bool = true
 
-## The journal file. Empty = user://dot_points/queue-<app_id>-<server_id>.jsonl, so two
+## The journal file. Empty = user://gs_points/queue-<app_id>-<server_id>.jsonl, so two
 ## servers on one host never share one. Give each server process its own file.
 @export var queue_path: String = ""
 
@@ -45,11 +45,11 @@ func resolved_queue_path() -> String:
 		return ""
 	if queue_path.strip_edges() != "":
 		return queue_path.strip_edges()
-	return "user://dot_points/queue-%d-%d.jsonl" % [app_id, server_id]
+	return "user://gs_points/queue-%d-%d.jsonl" % [app_id, server_id]
 
 
 func env_prefix() -> String:
-	return "DOT_POINTS_"
+	return "GS_POINTS_"
 
 
 func cli_prefix() -> String:

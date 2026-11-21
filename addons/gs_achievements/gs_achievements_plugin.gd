@@ -6,18 +6,18 @@ extends EditorPlugin
 ## No autoloads. A process running a server and a client holds two trackers, and an
 ## autoload could be neither twice.
 
-const _ICON := "res://addons/dot_achievements/icon_placeholder.svg"
+const _ICON := "res://addons/gs_achievements/icon_placeholder.svg"
 
 const _TYPES := [
 	[
 		"GSAchievementTracker",
 		"Node",
-		"res://addons/dot_achievements/runtime/dot_achievement_tracker.gd",
+		"res://addons/gs_achievements/runtime/gs_achievement_tracker.gd",
 	],
 	[
 		"GSAchievementStatsLink",
 		"Node",
-		"res://addons/dot_achievements/runtime/dot_achievement_stats_link.gd",
+		"res://addons/gs_achievements/runtime/gs_achievement_stats_link.gd",
 	],
 ]
 

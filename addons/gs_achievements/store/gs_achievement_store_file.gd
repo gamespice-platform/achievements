@@ -16,7 +16,7 @@ extends GSAchievementStore
 ## records file.
 
 ## Where the files go.
-var directory: String = "user://dot_achievements"
+var directory: String = "user://gs_achievements"
 
 ## Written atomically, by [GSSaveStoreFile] (GameSpice Save), which also flushes a browser's IndexedDB. A crash mid-write leaves the old file or the new one and never
 ## half of one — which for a progress file is indistinguishable from a player losing
@@ -26,7 +26,7 @@ var atomic: bool = true
 var _files: GSSaveStoreFile
 
 
-func _init(p_directory: String = "user://dot_achievements") -> void:
+func _init(p_directory: String = "user://gs_achievements") -> void:
 	directory = p_directory
 
 

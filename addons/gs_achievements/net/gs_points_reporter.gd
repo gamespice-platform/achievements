@@ -44,7 +44,7 @@ const META_KEYS := ["humans", "vsBot"]
 ## The backbone client: any object with [code]post_integration(String, Dictionary)[/code],
 ## GameSpice Auth's GSBackboneClient in practice. Found under [member client_service] if unset.
 var client: Object = null
-var client_service: StringName = &"dot_backbone_client"
+var client_service: StringName = &"gs_backbone_client"
 
 ## [code]func(bytes: PackedByteArray, private_key_pem: String) -> GSResult[/code] whose
 ## value is the base64 signature. Empty uses GSCloudSignature.sign.
@@ -385,7 +385,7 @@ func _sign(bytes: PackedByteArray, pem: String) -> GSResult:
 	if path == "":
 		return GSResult.fail(
 			GSError.CODE_UNSUPPORTED,
-			"No signer: install dot-cloud (GSCloudSignature) or set signer."
+			"No signer: install gs-cloud (GSCloudSignature) or set signer."
 		)
 	var script: Script = load(path)
 	return script.call("sign", bytes, pem)
