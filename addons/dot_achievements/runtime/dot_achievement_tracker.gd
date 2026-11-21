@@ -1,13 +1,13 @@
-class_name DotAchievementTracker
+class_name GSAchievementTracker
 extends Node
 
 ## Holds what players have done, decides what they have earned, and says so.
 ##
 ## [codeblock]
-## var tracker := DotAchievementTracker.new()
+## var tracker := GSAchievementTracker.new()
 ## tracker.catalogue = my_catalogue
-## tracker.store = DotAchievementStoreFile.new("user://achievements")
-## tracker.unlocked.connect(func(player: String, a: DotAchievement) -> void:
+## tracker.store = GSAchievementStoreFile.new("user://achievements")
+## tracker.unlocked.connect(func(player: String, a: GSAchievement) -> void:
 ##     hud.toast("%s unlocked" % a.display_name))
 ## add_child(tracker)
 ##
@@ -22,29 +22,29 @@ extends Node
 ## evaluating a returning player's lifetime achievements against a blank slate — so
 ## a player who has played for a year would unlock their first-kill achievement
 ## again, and then have it written back over the real record. Filing a reading for a
-## player who is not loaded is refused with [constant DotError.CODE_STATE].
+## player who is not loaded is refused with [constant GSError.CODE_STATE].
 
 const CHANNEL := "achievements"
 
 const SERVICE := &"dot_achievements"
 
 ## Somebody earned something. Fired once per achievement per player, ever.
-signal unlocked(player: String, achievement: DotAchievement)
+signal unlocked(player: String, achievement: GSAchievement)
 
 ## Progress towards something moved. Only for achievements that can draw a bar, and
 ## only when the fraction actually changed — a counter at 0.4001 is not news.
-signal progressed(player: String, achievement: DotAchievement, fraction: float)
+signal progressed(player: String, achievement: GSAchievement, fraction: float)
 
 ## A player's progress could not be read. They are not begun and nothing will be
 ## filed for them.
-signal load_failed(player: String, error: DotError)
+signal load_failed(player: String, error: GSError)
 
 ## A save failed. Worth surfacing: it is the one failure a player feels.
-signal save_failed(player: String, error: DotError)
+signal save_failed(player: String, error: GSError)
 
 @export_group("Catalogue")
 
-@export var catalogue: DotAchievementCatalogue = null
+@export var catalogue: GSAchievementCatalogue = null
 
 ## A JSON catalogue, loaded when [member catalogue] is not set.
 @export_file("*.json") var catalogue_file: String = ""
@@ -68,8 +68,8 @@ signal save_failed(player: String, error: DotError)
 ## Report unlocks to the backbone through [member reporter].
 ##
 ## [b]The tracker is what drives the reporter, on [member report_interval].[/b] It used
-## to only queue: nothing in the family called [method DotAchievementReporter.define] or
-## [method DotAchievementReporter.flush], so with this on every unlock sat in the queue
+## to only queue: nothing in the family called [method GSAchievementReporter.define] or
+## [method GSAchievementReporter.flush], so with this on every unlock sat in the queue
 ## until the queue limit dropped it. The tracker is the owner because it is the one node
 ## a host already places, and the family has no autoload to hang a timer on.
 @export var report_to_backbone: bool = false
@@ -84,12 +84,12 @@ signal save_failed(player: String, error: DotError)
 ## Where the default file store keeps progress (user:// is already per game).
 @export var store_directory: String = "user://dot_achievements"
 
-## Where progress lives. Left null, start() makes a [DotAchievementStoreFile] in
-## [member store_directory]; assign [DotAchievementStoreMemory] for throwaway runs.
-var store: DotAchievementStore = null
+## Where progress lives. Left null, start() makes a [GSAchievementStoreFile] in
+## [member store_directory]; assign [GSAchievementStoreMemory] for throwaway runs.
+var store: GSAchievementStore = null
 
 ## The backbone reporter. Created on start; needs a client to do anything.
-var reporter: DotAchievementReporter = null
+var reporter: GSAchievementReporter = null
 
 var _players: Dictionary = {}
 var _fractions: Dictionary = {}
@@ -113,22 +113,22 @@ func _ready() -> void:
 
 ## Prepares the tracker. Idempotent, and called by [method _ready].
 ##
-## Explicit because a tracker created through a [DotNodeRef] has already run
+## Explicit because a tracker created through a [GSNodeRef] has already run
 ## [method _ready] by the time its host assigns a catalogue — the ordering that left
 ## GameSpice Server's audit log unopened in every default configuration.
-func start() -> DotResult:
+func start() -> GSResult:
 	if _started:
-		return DotResult.success(self)
+		return GSResult.success(self)
 
 	if catalogue == null and catalogue_file != "":
-		var loaded := DotAchievementCatalogue.from_json_file(catalogue_file)
+		var loaded := GSAchievementCatalogue.from_json_file(catalogue_file)
 		if not loaded.ok:
 			return loaded.wrap("The achievement catalogue could not be loaded.")
 		catalogue = loaded.value
 
 	if catalogue == null:
-		return DotResult.fail(
-			DotError.CODE_STATE, "The tracker has no catalogue."
+		return GSResult.fail(
+			GSError.CODE_STATE, "The tracker has no catalogue."
 		)
 
 	var valid := catalogue.validate()
@@ -136,13 +136,13 @@ func start() -> DotResult:
 		return valid.wrap("The achievement catalogue is not usable.")
 
 	if store == null:
-		store = DotAchievementStoreFile.new(store_directory)
+		store = GSAchievementStoreFile.new(store_directory)
 
 	if reporter == null:
-		reporter = DotAchievementReporter.new()
+		reporter = GSAchievementReporter.new()
 
 	if register_as != &"":
-		DotRegistry.register(register_as, self)
+		GSRegistry.register(register_as, self)
 
 	_autosave_left = autosave_interval
 	_report_left = report_interval
@@ -151,13 +151,13 @@ func start() -> DotResult:
 	# halves of [method _process] return at once when they have nothing to do.
 	set_process(true)
 
-	DotLog.info(CHANNEL, "achievement tracker ready", {
+	GSLog.info(CHANNEL, "achievement tracker ready", {
 		"achievements": catalogue.size(),
 		"points": catalogue.total_points(),
 		"stats": catalogue.watched_stats().size(),
 	})
 
-	return DotResult.success(self)
+	return GSResult.success(self)
 
 
 func _process(delta: float) -> void:
@@ -180,7 +180,7 @@ func _tick_report(delta: float) -> void:
 
 	_define_wait -= delta
 	# Clamped, so an interval shortened after start takes effect now rather than after the
-	# old one runs out -- a tracker placed through a DotNodeRef has started before its host
+	# old one runs out -- a tracker placed through a GSNodeRef has started before its host
 	# gets to configure it.
 	_report_left = minf(_report_left, report_interval) - delta
 	if _report_left > 0.0:
@@ -196,11 +196,11 @@ func _tick_report(delta: float) -> void:
 ##
 ## Called on [member report_interval] while [member report_to_backbone] is on. A host
 ## can also await it itself -- before a shutdown, say, so the last round's unlocks are
-## not left in the queue. Returns what [method DotAchievementReporter.flush] returned,
+## not left in the queue. Returns what [method GSAchievementReporter.flush] returned,
 ## or success(0) when there was nothing to do.
-func report() -> DotResult:
+func report() -> GSResult:
 	if reporter == null or catalogue == null or _reporting:
-		return DotResult.success(0)
+		return GSResult.success(0)
 
 	if not reporter.is_available():
 		# The reporter says so itself, once, when it has something queued and nobody to
@@ -210,7 +210,7 @@ func report() -> DotResult:
 	_reporting = true
 
 	if _define_due and _define_wait <= 0.0:
-		var declared: DotResult = await reporter.define(catalogue, report_app)
+		var declared: GSResult = await reporter.define(catalogue, report_app)
 		if declared.ok:
 			_define_due = false
 		elif declared.error != null and declared.error.is_retryable():
@@ -219,7 +219,7 @@ func report() -> DotResult:
 		else:
 			_define_due = false
 
-	var res: DotResult = await reporter.flush()
+	var res: GSResult = await reporter.flush()
 	_reporting = false
 	return res
 
@@ -227,34 +227,34 @@ func report() -> DotResult:
 # --- Players ---------------------------------------------------------------
 
 ## Loads a player's lifetime progress. Await it before filing anything for them.
-func begin(player: String) -> DotResult:
+func begin(player: String) -> GSResult:
 	if not _started:
 		var started := start()
 		if not started.ok:
 			return started
 
 	if player.strip_edges() == "":
-		return DotResult.fail(DotError.CODE_INVALID, "A player needs a key.")
+		return GSResult.fail(GSError.CODE_INVALID, "A player needs a key.")
 
 	if _players.has(player):
-		return DotResult.success(_players[player])
+		return GSResult.success(_players[player])
 
 	# Assigned to a variable and then checked. `await store.load(x).ok` binds the
 	# await to the property access rather than to the call, so the coroutine is never
 	# awaited and the branch reads a property of a signal.
-	var res: DotResult = await store.load_progress(player)
+	var res: GSResult = await store.load_progress(player)
 	if not res.ok:
 		load_failed.emit(player, res.error)
 		return res.wrap("Could not load achievement progress for a player.")
 
-	var progress: DotAchievementProgress = res.value
+	var progress: GSAchievementProgress = res.value
 
 	# The stored points total is a cache, and a catalogue whose values changed since
 	# the file was written makes it wrong. Recounted rather than trusted.
 	progress.recount(catalogue)
 
 	_players[player] = progress
-	return DotResult.success(progress)
+	return GSResult.success(progress)
 
 
 func has(player: String) -> bool:
@@ -262,12 +262,12 @@ func has(player: String) -> bool:
 
 
 ## Saves and forgets a player. Call it when they disconnect.
-func end(player: String) -> DotResult:
+func end(player: String) -> GSResult:
 	if not _players.has(player):
-		return DotResult.success(0)
+		return GSResult.success(0)
 
-	var progress: DotAchievementProgress = _players[player]
-	var res: DotResult = await _save(player, progress)
+	var progress: GSAchievementProgress = _players[player]
+	var res: GSResult = await _save(player, progress)
 
 	_players.erase(player)
 	_fractions.erase(player)
@@ -275,7 +275,7 @@ func end(player: String) -> DotResult:
 	return res
 
 
-func progress_of(player: String) -> DotAchievementProgress:
+func progress_of(player: String) -> GSAchievementProgress:
 	if _players.has(player):
 		return _players[player]
 	return null
@@ -295,19 +295,19 @@ func points_of(player: String) -> int:
 
 ## Files one reading, merged by the rule kind the catalogue declared for that stat.
 ##
-## For a [constant DotAchievementRule.Merge.SUM] stat that is a delta — one kill,
+## For a [constant GSAchievementRule.Merge.SUM] stat that is a delta — one kill,
 ## twelve metres. For the others it is the value itself: a top speed, a level, a best
 ## time. The stat's own declaration decides, which is why one method serves both and
 ## why a game cannot get it the wrong way round by calling the wrong one.
-func record(player: String, stat: StringName, reading: float = 1.0) -> DotResult:
+func record(player: String, stat: StringName, reading: float = 1.0) -> GSResult:
 	if not _started:
 		var started := start()
 		if not started.ok:
 			return started
 
 	if not _players.has(player):
-		return DotResult.fail(
-			DotError.CODE_STATE,
+		return GSResult.fail(
+			GSError.CODE_STATE,
 			"That player is not loaded; call begin() and await it first.",
 			player
 		)
@@ -317,13 +317,13 @@ func record(player: String, stat: StringName, reading: float = 1.0) -> DotResult
 		# Not a failure. A game reports far more than a catalogue reads, and refusing
 		# every unwatched stat would make the call site branch on which stats happen
 		# to have achievements today.
-		return DotResult.success(0)
+		return GSResult.success(0)
 
-	var progress: DotAchievementProgress = _players[player]
+	var progress: GSAchievementProgress = _players[player]
 	var had := progress.has_value(stat)
 	var held := progress.value_of(stat)
 
-	var rule := DotAchievementRule.make(stat, 0.0, DotAchievementRule.Op.AT_LEAST, merge as DotAchievementRule.Merge)
+	var rule := GSAchievementRule.make(stat, 0.0, GSAchievementRule.Op.AT_LEAST, merge as GSAchievementRule.Merge)
 	progress.set_value(stat, rule.merge_value(held, reading, had))
 
 	return _evaluate(player, progress, stat)
@@ -334,13 +334,13 @@ func record(player: String, stat: StringName, reading: float = 1.0) -> DotResult
 ## For a game seeding a player's lifetime numbers from somewhere else — a save file,
 ## a backbone profile, a migration. Not for gameplay: a reading filed this way skips
 ## the one rule every party is supposed to agree on.
-func set_value(player: String, stat: StringName, value: float) -> DotResult:
+func set_value(player: String, stat: StringName, value: float) -> GSResult:
 	if not _players.has(player):
-		return DotResult.fail(
-			DotError.CODE_STATE, "That player is not loaded.", player
+		return GSResult.fail(
+			GSError.CODE_STATE, "That player is not loaded.", player
 		)
 
-	var progress: DotAchievementProgress = _players[player]
+	var progress: GSAchievementProgress = _players[player]
 	progress.set_value(stat, value)
 
 	return _evaluate(player, progress, stat)
@@ -351,45 +351,45 @@ func set_value(player: String, stat: StringName, value: float) -> DotResult:
 ## For an achievement whose condition is not a number — "played on the day the server
 ## opened", "was in the room when somebody did the thing". A catalogue still has to
 ## declare it, so it can be listed and is worth points.
-func unlock(player: String, id: StringName, reason: String = "") -> DotResult:
+func unlock(player: String, id: StringName, reason: String = "") -> GSResult:
 	if not _players.has(player):
-		return DotResult.fail(
-			DotError.CODE_STATE, "That player is not loaded.", player
+		return GSResult.fail(
+			GSError.CODE_STATE, "That player is not loaded.", player
 		)
 
 	var achievement := catalogue.find(id)
 	if achievement == null:
-		return DotResult.fail(
-			DotError.CODE_INVALID, "No such achievement.", String(id)
+		return GSResult.fail(
+			GSError.CODE_INVALID, "No such achievement.", String(id)
 		)
 
-	var progress: DotAchievementProgress = _players[player]
+	var progress: GSAchievementProgress = _players[player]
 	if not _award(player, progress, achievement, reason):
-		return DotResult.success(false)
+		return GSResult.success(false)
 
-	return DotResult.success(true)
+	return GSResult.success(true)
 
 
 ## Takes one back. For a moderator, or a game resetting a season.
-func revoke(player: String, id: StringName) -> DotResult:
+func revoke(player: String, id: StringName) -> GSResult:
 	if not _players.has(player):
-		return DotResult.fail(
-			DotError.CODE_STATE, "That player is not loaded.", player
+		return GSResult.fail(
+			GSError.CODE_STATE, "That player is not loaded.", player
 		)
 
 	var achievement := catalogue.find(id)
 	if achievement == null:
-		return DotResult.fail(
-			DotError.CODE_INVALID, "No such achievement.", String(id)
+		return GSResult.fail(
+			GSError.CODE_INVALID, "No such achievement.", String(id)
 		)
 
-	var progress: DotAchievementProgress = _players[player]
-	return DotResult.success(progress.revoke(id, achievement.points))
+	var progress: GSAchievementProgress = _players[player]
+	return GSResult.success(progress.revoke(id, achievement.points))
 
 
 func _evaluate(
-	player: String, progress: DotAchievementProgress, stat: StringName
-) -> DotResult:
+	player: String, progress: GSAchievementProgress, stat: StringName
+) -> GSResult:
 	var awarded := 0
 
 	# Only the achievements this stat could have moved. Walking the whole catalogue
@@ -417,13 +417,13 @@ func _evaluate(
 			_fractions[key] = fraction
 			progressed.emit(player, achievement, fraction)
 
-	return DotResult.success(awarded)
+	return GSResult.success(awarded)
 
 
 func _award(
 	player: String,
-	progress: DotAchievementProgress,
-	achievement: DotAchievement,
+	progress: GSAchievementProgress,
+	achievement: GSAchievement,
 	reason: String
 ) -> bool:
 	var at := int(Time.get_unix_time_from_system())
@@ -431,7 +431,7 @@ func _award(
 	if not progress.mark_unlocked(achievement.id, at, achievement.points):
 		return false
 
-	DotLog.info(CHANNEL, "achievement unlocked", {
+	GSLog.info(CHANNEL, "achievement unlocked", {
 		"player": player.substr(0, 16),
 		"achievement": String(achievement.id),
 		"points": achievement.points,
@@ -456,26 +456,26 @@ func _award(
 # --- Saving ----------------------------------------------------------------
 
 ## Saves every player whose progress changed.
-func flush() -> DotResult:
+func flush() -> GSResult:
 	return await _save_dirty()
 
 
-func _save_dirty() -> DotResult:
+func _save_dirty() -> GSResult:
 	var saved := 0
 
 	for player in _players.keys():
-		var progress: DotAchievementProgress = _players[player]
+		var progress: GSAchievementProgress = _players[player]
 		if not progress.dirty:
 			continue
-		var res: DotResult = await _save(str(player), progress)
+		var res: GSResult = await _save(str(player), progress)
 		if res.ok:
 			saved += 1
 
-	return DotResult.success(saved)
+	return GSResult.success(saved)
 
 
-func _save(player: String, progress: DotAchievementProgress) -> DotResult:
-	var res: DotResult = await store.save_progress(player, progress)
+func _save(player: String, progress: GSAchievementProgress) -> GSResult:
+	var res: GSResult = await store.save_progress(player, progress)
 
 	if not res.ok:
 		# The dirty flag is deliberately left set. Clearing it on a failed save is how
@@ -520,7 +520,7 @@ func listing(player: String) -> Array[Dictionary]:
 
 func _exit_tree() -> void:
 	if register_as != &"":
-		DotRegistry.unregister_instance(register_as, self)
+		GSRegistry.unregister_instance(register_as, self)
 
 
 func describe() -> Dictionary:
@@ -544,7 +544,7 @@ func describe_lines() -> PackedStringArray:
 		out.append_array(reporter.describe_lines())
 
 	for player in _players.keys():
-		var progress: DotAchievementProgress = _players[player]
+		var progress: GSAchievementProgress = _players[player]
 		out.append("  %s: %s" % [str(player).substr(0, 16), progress.describe()])
 
 	return out

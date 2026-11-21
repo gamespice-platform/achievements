@@ -1,5 +1,5 @@
-class_name DotAchievementStoreMemory
-extends DotAchievementStore
+class_name GSAchievementStoreMemory
+extends GSAchievementStore
 
 ## Progress held in memory and lost on exit.
 ##
@@ -15,20 +15,20 @@ extends DotAchievementStore
 var _rows: Dictionary = {}
 
 
-func _load_progress(player: String) -> DotResult:
+func _load_progress(player: String) -> GSResult:
 	if not _rows.has(player):
-		return DotResult.success(DotAchievementProgress.new())
+		return GSResult.success(GSAchievementProgress.new())
 
 	# Round-tripped rather than handed back. Two callers holding one progress object
 	# is two callers writing to it, and the second save wins silently.
-	return DotAchievementProgress.from_dictionary(
+	return GSAchievementProgress.from_dictionary(
 		(_rows[player] as Dictionary).duplicate(true)
 	)
 
 
-func _save_progress(player: String, progress: DotAchievementProgress) -> DotResult:
+func _save_progress(player: String, progress: GSAchievementProgress) -> GSResult:
 	_rows[player] = progress.to_dictionary()
-	return DotResult.success(1)
+	return GSResult.success(1)
 
 
 func size() -> int:

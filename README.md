@@ -15,27 +15,27 @@ Optional, and never named in the source:
 
 | Addon | What it adds |
 | --- | --- |
-| [GameSpice Stats](https://github.com/gamespice-platform/stats) | The natural source of the numbers, bridged by `DotAchievementStatsLink`. |
+| [GameSpice Stats](https://github.com/gamespice-platform/stats) | The natural source of the numbers, bridged by `GSAchievementStatsLink`. |
 | [GameSpice Auth](https://github.com/gamespice-platform/auth) | The back-end client for reporting. |
 | [GameSpice SQL](https://github.com/gamespice-platform/sql) | SQLite, Postgres or MySQL/MariaDB storage. |
-| [GameSpice Cloud](https://github.com/gamespice-platform/cloud) | The RSA signature `DotPointsReporter` signs its batches with. |
+| [GameSpice Cloud](https://github.com/gamespice-platform/cloud) | The RSA signature `GSPointsReporter` signs its batches with. |
 
 ## Quick start
 
 ```gdscript
-var catalogue := DotAchievementCatalogue.of([
-    DotAchievement.counter(&"k10",  "First Blood", &"kills", 10),
-    DotAchievement.counter(&"k100", "Centurion",   &"kills", 100),
-    DotAchievement.make(&"flawless", "Flawless", [
-        DotAchievementRule.make(&"round_wins", 1),
-        DotAchievementRule.make(&"deaths", 0, DotAchievementRule.Op.AT_MOST),
+var catalogue := GSAchievementCatalogue.of([
+    GSAchievement.counter(&"k10",  "First Blood", &"kills", 10),
+    GSAchievement.counter(&"k100", "Centurion",   &"kills", 100),
+    GSAchievement.make(&"flawless", "Flawless", [
+        GSAchievementRule.make(&"round_wins", 1),
+        GSAchievementRule.make(&"deaths", 0, GSAchievementRule.Op.AT_MOST),
     ]),
 ])
 
-var tracker := DotAchievementTracker.new()
+var tracker := GSAchievementTracker.new()
 tracker.catalogue = catalogue
-tracker.store = DotAchievementStoreFile.new("user://achievements")
-tracker.unlocked.connect(func(player: String, a: DotAchievement) -> void:
+tracker.store = GSAchievementStoreFile.new("user://achievements")
+tracker.unlocked.connect(func(player: String, a: GSAchievement) -> void:
     hud.toast("%s unlocked" % a.display_name))
 add_child(tracker)
 
@@ -50,12 +50,12 @@ await tracker.end(player_key)           # saves
 
 | Store | Use it for |
 | --- | --- |
-| `DotAchievementStoreMemory` | Tests and throwaway sessions. |
-| `DotAchievementStoreFile` | One file per player on disk. |
-| `DotAchievementStoreSql` | Servers that share progress. Needs a GameSpice SQL driver. |
+| `GSAchievementStoreMemory` | Tests and throwaway sessions. |
+| `GSAchievementStoreFile` | One file per player on disk. |
+| `GSAchievementStoreSql` | Servers that share progress. Needs a GameSpice SQL driver. |
 
 ```gdscript
-var store := DotAchievementStoreSql.new(driver)   # any dot-sql driver
+var store := GSAchievementStoreSql.new(driver)   # any dot-sql driver
 await store.open()                                # creates or migrates its two tables
 tracker.store = store
 ```
@@ -65,7 +65,7 @@ The SQL store keeps one row per held number and one row per unlock (`dot_achieve
 ## With Stats
 
 ```gdscript
-var link := DotAchievementStatsLink.new()
+var link := GSAchievementStatsLink.new()
 link.tracker = tracker
 link.stats = stats_tracker
 add_child(link)
@@ -87,12 +87,12 @@ Hidden entries are left out until earned. Secret ones are listed without their d
 A dedicated server reports what happened (a kill, a round won) and the site decides what it is worth. Nothing here sends an amount.
 
 ```gdscript
-var cfg := DotPointsReporterConfig.new()
+var cfg := GSPointsReporterConfig.new()
 cfg.app_id = 12
 cfg.server_id = 34
 cfg.private_key_path = "/etc/mygame/points.pem"
 var loaded := cfg.load_layered("")   # DOT_POINTS_* and --points-* override
-var points := DotPointsReporter.new()
+var points := GSPointsReporter.new()
 add_child(points)
 var configured := points.configure(cfg)   # fails loudly on a bad config or key
 points.report(player_key, "kill", 1, {"humans": 10, "vsBot": false})
@@ -116,7 +116,7 @@ You can export a catalogue as the site's `dot-achievement-defs` JSON, so the sit
 
 | Option | Meaning |
 | --- | --- |
-| `--source` | Script that holds the static method returning your `DotAchievementCatalogue`. |
+| `--source` | Script that holds the static method returning your `GSAchievementCatalogue`. |
 | `--method` | Name of that method. |
 | `--out` | Output file. Default `deployment/achievement-defs.json`. |
 | `--game` | Pin the site app id. Left out by default so one file imports into any environment. |

@@ -1,5 +1,5 @@
 @tool
-class_name DotAchievement
+class_name GSAchievement
 extends Resource
 
 ## One thing a player can earn, as a document that can be checked without loading
@@ -46,7 +46,7 @@ extends Resource
 @export_group("Requirements")
 
 ## Every rule, or any of them, depending on [member require_all].
-@export var requirements: Array[DotAchievementRule] = []
+@export var requirements: Array[GSAchievementRule] = []
 
 ## All of the rules must hold. Off means any one of them does.
 @export var require_all: bool = true
@@ -66,9 +66,9 @@ extends Resource
 
 
 static func make(
-	p_id: StringName, p_name: String, p_rules: Array[DotAchievementRule]
-) -> DotAchievement:
-	var out := DotAchievement.new()
+	p_id: StringName, p_name: String, p_rules: Array[GSAchievementRule]
+) -> GSAchievement:
+	var out := GSAchievement.new()
 	out.id = p_id
 	out.display_name = p_name
 	out.requirements = p_rules
@@ -78,9 +78,9 @@ static func make(
 ## The single-rule form, which is most of them.
 static func counter(
 	p_id: StringName, p_name: String, stat: StringName, threshold: float
-) -> DotAchievement:
-	var rules: Array[DotAchievementRule] = [
-		DotAchievementRule.make(stat, threshold)
+) -> GSAchievement:
+	var rules: Array[GSAchievementRule] = [
+		GSAchievementRule.make(stat, threshold)
 	]
 	return make(p_id, p_name, rules)
 
@@ -97,7 +97,7 @@ func watched_stats() -> Array[StringName]:
 ## Whether [param values] earns this.
 ##
 ## A missing stat reads as zero. That is right for a counter and worth knowing for a
-## [constant DotAchievementRule.Op.AT_MOST] rule: "deaths at most 0" is satisfied by a
+## [constant GSAchievementRule.Op.AT_MOST] rule: "deaths at most 0" is satisfied by a
 ## player who has never been recorded dying, which is what the rule says and not
 ## always what its author meant.
 func evaluate(values: Dictionary) -> bool:
@@ -150,7 +150,7 @@ func progress(values: Dictionary) -> float:
 
 ## Whether a meaningful bar can be drawn at all.
 ##
-## An achievement of pure [constant DotAchievementRule.Op.AT_MOST] rules is earned or
+## An achievement of pure [constant GSAchievementRule.Op.AT_MOST] rules is earned or
 ## not, and a bar for it would move from 0 to 1 in one step — which reads to a player
 ## as a bar that is broken.
 func has_progress() -> bool:
@@ -160,34 +160,34 @@ func has_progress() -> bool:
 	return false
 
 
-func validate() -> DotResult:
+func validate() -> GSResult:
 	if String(id).strip_edges() == "":
-		return DotResult.fail(DotError.CODE_INVALID, "An achievement needs an id.")
+		return GSResult.fail(GSError.CODE_INVALID, "An achievement needs an id.")
 
 	if requirements.is_empty():
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"An achievement with no requirements can never be earned.",
 			String(id)
 		)
 
 	for rule in requirements:
 		if rule == null:
-			return DotResult.fail(
-				DotError.CODE_INVALID, "An achievement has an empty rule.", String(id)
+			return GSResult.fail(
+				GSError.CODE_INVALID, "An achievement has an empty rule.", String(id)
 			)
 		var valid := rule.validate()
 		if not valid.ok:
 			return valid.wrap("Achievement '%s' has a bad rule." % String(id))
 
 	if tier > 0 and String(series).strip_edges() == "":
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"An achievement with a tier needs a series to be a tier of.",
 			String(id)
 		)
 
-	return DotResult.success(self)
+	return GSResult.success(self)
 
 
 ## The player-facing form, with [member secret] and [member hidden] applied.
@@ -244,8 +244,8 @@ func to_dictionary() -> Dictionary:
 	return out
 
 
-static func from_dictionary(data: Dictionary) -> DotResult:
-	var out := DotAchievement.new()
+static func from_dictionary(data: Dictionary) -> GSResult:
+	var out := GSAchievement.new()
 	out.id = StringName(str(data.get("id", "")))
 	out.display_name = str(data.get("name", ""))
 	out.description = str(data.get("description", ""))
@@ -260,14 +260,14 @@ static func from_dictionary(data: Dictionary) -> DotResult:
 
 	var rules: Variant = data.get("rules")
 	if typeof(rules) != TYPE_ARRAY:
-		return DotResult.fail(
-			DotError.CODE_PARSE, "An achievement needs a rules array.", String(out.id)
+		return GSResult.fail(
+			GSError.CODE_PARSE, "An achievement needs a rules array.", String(out.id)
 		)
 
 	for entry in (rules as Array):
 		if typeof(entry) != TYPE_DICTIONARY:
 			continue
-		var parsed := DotAchievementRule.from_dictionary(entry as Dictionary)
+		var parsed := GSAchievementRule.from_dictionary(entry as Dictionary)
 		if not parsed.ok:
 			return parsed.wrap("Achievement '%s' has a bad rule." % String(out.id))
 		out.requirements.append(parsed.value)
@@ -287,4 +287,4 @@ func describe() -> String:
 
 
 func _to_string() -> String:
-	return "DotAchievement(%s)" % String(id)
+	return "GSAchievement(%s)" % String(id)

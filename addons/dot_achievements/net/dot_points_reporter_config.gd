@@ -1,7 +1,7 @@
-class_name DotPointsReporterConfig
-extends DotConfig
+class_name GSPointsReporterConfig
+extends GSConfig
 
-## Settings for [DotPointsReporter]. Layers, weakest first: defaults < a JSON file <
+## Settings for [GSPointsReporter]. Layers, weakest first: defaults < a JSON file <
 ## `DOT_POINTS_*` < `--points-<key>=`. The private key itself is never read from the
 ## environment or the command line; point [member private_key_path] at a file instead.
 
@@ -60,7 +60,7 @@ func sensitive_keys() -> PackedStringArray:
 	return PackedStringArray(["private_key_pem"])
 
 
-func validate() -> DotResult:
+func validate() -> GSResult:
 	var problems := PackedStringArray()
 	if app_id <= 0:
 		problems.append("app_id must be a positive app id (is %d)" % app_id)
@@ -81,7 +81,7 @@ func validate() -> DotResult:
 	if max_pending_events < 0:
 		problems.append("max_pending_events must be 0 (unlimited) or more (is %d)" % max_pending_events)
 	if not problems.is_empty():
-		return DotResult.fail(
-			DotError.CODE_INVALID, "The points reporter config is invalid.", "; ".join(problems)
+		return GSResult.fail(
+			GSError.CODE_INVALID, "The points reporter config is invalid.", "; ".join(problems)
 		)
-	return DotResult.success(null)
+	return GSResult.success(null)

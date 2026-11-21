@@ -1,4 +1,4 @@
-class_name DotAchievementProgress
+class_name GSAchievementProgress
 extends RefCounted
 
 ## One player's numbers and what they have earned.
@@ -69,7 +69,7 @@ func unlocked_count() -> int:
 
 func to_dictionary() -> Dictionary:
 	# Copies, not the live dictionaries. A Dictionary is a reference in GDScript, and
-	# handing out the live one is how DotLeaderboardDef ended up with every scoped
+	# handing out the live one is how GSLeaderboardDef ended up with every scoped
 	# board and the template it came from being one object.
 	return {
 		"version": 1,
@@ -79,8 +79,8 @@ func to_dictionary() -> Dictionary:
 	}
 
 
-static func from_dictionary(data: Dictionary) -> DotResult:
-	var out := DotAchievementProgress.new()
+static func from_dictionary(data: Dictionary) -> GSResult:
+	var out := GSAchievementProgress.new()
 
 	var values_raw: Variant = data.get("values")
 	if typeof(values_raw) == TYPE_DICTIONARY:
@@ -95,14 +95,14 @@ static func from_dictionary(data: Dictionary) -> DotResult:
 	out.points = int(data.get("points", 0))
 	out.dirty = false
 
-	return DotResult.success(out)
+	return GSResult.success(out)
 
 
 ## Recomputes [member points] from a catalogue.
 ##
 ## The cached total is a cache, and a catalogue whose point values changed since a
 ## file was written makes it wrong. Called after a load rather than trusted.
-func recount(catalogue: DotAchievementCatalogue) -> int:
+func recount(catalogue: GSAchievementCatalogue) -> int:
 	var total := 0
 
 	for id in unlocked.keys():

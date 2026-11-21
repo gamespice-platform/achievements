@@ -10,12 +10,12 @@ const _ICON := "res://addons/dot_achievements/icon_placeholder.svg"
 
 const _TYPES := [
 	[
-		"DotAchievementTracker",
+		"GSAchievementTracker",
 		"Node",
 		"res://addons/dot_achievements/runtime/dot_achievement_tracker.gd",
 	],
 	[
-		"DotAchievementStatsLink",
+		"GSAchievementStatsLink",
 		"Node",
 		"res://addons/dot_achievements/runtime/dot_achievement_stats_link.gd",
 	],

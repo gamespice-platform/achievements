@@ -14,7 +14,7 @@ func _init() -> void:
 		printerr("export_site_defs: %s has no static %s()" % [source, method])
 		quit(2)
 		return
-	var catalogue := script.call(method) as DotAchievementCatalogue
+	var catalogue := script.call(method) as GSAchievementCatalogue
 	var valid := catalogue.validate()
 	if not valid.ok:
 		printerr("export_site_defs: catalogue invalid: %s" % valid.message)

@@ -10,11 +10,11 @@ var _section_count := 0
 
 ## A recording driver whose every statement waits a frame, the way one behind a network
 ## does — which is what lets two saves of one player be in flight at once.
-class SlowDriver extends DotSqlDriverRecording:
-	func _init(p_dialect: int = DotSqlDialect.Kind.SQLITE) -> void:
+class SlowDriver extends GSSqlDriverRecording:
+	func _init(p_dialect: int = GSSqlDialect.Kind.SQLITE) -> void:
 		super(p_dialect)
 
-	func _execute(sql: String, params: Array) -> DotResult:
+	func _execute(sql: String, params: Array) -> GSResult:
 		await Engine.get_main_loop().process_frame
 		return await super(sql, params)
 
@@ -25,22 +25,22 @@ func _test_sql_store() -> void:
 	_section("the SQL store, against a driver that records what it is asked")
 
 	_check(
-		DotSqlSchema.validate(DotAchievementSqlSchema.values_spec()).ok
-			and DotSqlSchema.validate(DotAchievementSqlSchema.unlocks_spec()).ok,
+		GSSqlSchema.validate(GSAchievementSqlSchema.values_spec()).ok
+			and GSSqlSchema.validate(GSAchievementSqlSchema.unlocks_spec()).ok,
 		"both table specs are valid: safe names, no reserved words, indexable key columns"
 	)
 
-	var driver := DotSqlDriverRecording.new(DotSqlDialect.Kind.POSTGRES)
+	var driver := GSSqlDriverRecording.new(GSSqlDialect.Kind.POSTGRES)
 	driver.answers = {"SELECT version FROM": []}
-	var store := DotAchievementStoreSql.new(driver)
+	var store := GSAchievementStoreSql.new(driver)
 
-	var closed: DotResult = await store.load_progress("ada")
+	var closed: GSResult = await store.load_progress("ada")
 	_check(
-		not closed.ok and closed.code() == DotError.CODE_STATE,
+		not closed.ok and closed.code() == GSError.CODE_STATE,
 		"a store that was never opened fails the load rather than handing back a blank player"
 	)
 
-	var opened: DotResult = await store.open()
+	var opened: GSResult = await store.open()
 	_check(opened.ok, "the store opens and creates its schema")
 	_check(
 		driver.matching("CREATE TABLE IF NOT EXISTS dot_achievement_values").size() == 1
@@ -64,8 +64,8 @@ func _test_sql_store() -> void:
 		"SELECT stat, amount": [{"stat": "kills", "amount": 12.0}, {"stat": "best_time", "amount": "9.5"}, {"stat": "junk", "amount": "banana"}],
 		"SELECT achievement, unlocked_at": [{"achievement": "k10", "unlocked_at": 1700000000.0}],
 	}
-	var loaded: DotResult = await store.load_progress("ada's key")
-	var progress: DotAchievementProgress = loaded.value if loaded.ok else null
+	var loaded: GSResult = await store.load_progress("ada's key")
+	var progress: GSAchievementProgress = loaded.value if loaded.ok else null
 	_check(
 		driver.statements.size() == 2
 			and (driver.statements[0]["params"] as Array) == ["ada's key"]
@@ -94,22 +94,22 @@ func _test_sql_store() -> void:
 
 ## Saving: upserts, then insert-if-absent unlocks, then the deletes.
 func _test_sql_save() -> void:
-	var driver := DotSqlDriverRecording.new(DotSqlDialect.Kind.POSTGRES)
+	var driver := GSSqlDriverRecording.new(GSSqlDialect.Kind.POSTGRES)
 	driver.answers = {"SELECT version FROM": []}
-	var store := DotAchievementStoreSql.new(driver)
+	var store := GSAchievementStoreSql.new(driver)
 	await store.open()
 	driver.clear()
 	driver.answers = {}
 	driver.rows = []
-	var fresh: DotResult = await store.load_progress("nobody")
+	var fresh: GSResult = await store.load_progress("nobody")
 	_check(
-		fresh.ok and (fresh.value as DotAchievementProgress).unlocked_count() == 0,
+		fresh.ok and (fresh.value as GSAchievementProgress).unlocked_count() == 0,
 		"a player with no rows is a fresh player, not a failure"
 	)
 
 	var saving := _sample_progress()
 	driver.clear()
-	var saved: DotResult = await store.save_progress("ada", saving)
+	var saved: GSResult = await store.save_progress("ada", saving)
 	var sqls: Array = driver.statements.map(func(s): return str(s["sql"]))
 	_check(saved.ok and sqls.size() == 5, "a save is one value, two unlocks and two deletes (%d)" % sqls.size())
 	if sqls.size() == 5:
@@ -139,7 +139,7 @@ func _test_sql_save() -> void:
 		for _i in range(5):
 			_check(false, "the save statements were not recorded")
 
-	var revoked := DotAchievementProgress.new()
+	var revoked := GSAchievementProgress.new()
 	driver.clear()
 	await store.save_progress("ada", revoked)
 	_check(
@@ -148,9 +148,9 @@ func _test_sql_save() -> void:
 		"a progress with nothing unlocked deletes every unlock: a revocation reaches the table"
 	)
 
-	var mysql := DotSqlDriverRecording.new(DotSqlDialect.Kind.MYSQL)
+	var mysql := GSSqlDriverRecording.new(GSSqlDialect.Kind.MYSQL)
 	mysql.answers = {"SELECT version FROM": []}
-	var mysql_store := DotAchievementStoreSql.new(mysql)
+	var mysql_store := GSAchievementStoreSql.new(mysql)
 	await mysql_store.open()
 	mysql.clear()
 	await mysql_store.save_progress("ada", saving)
@@ -163,23 +163,23 @@ func _test_sql_save() -> void:
 
 ## Failures are failures, and saves of one player never interleave.
 func _test_sql_failures() -> void:
-	var driver := DotSqlDriverRecording.new(DotSqlDialect.Kind.POSTGRES)
+	var driver := GSSqlDriverRecording.new(GSSqlDialect.Kind.POSTGRES)
 	driver.answers = {"SELECT version FROM": []}
-	var store := DotAchievementStoreSql.new(driver)
+	var store := GSAchievementStoreSql.new(driver)
 	await store.open()
 	var saving := _sample_progress()
 	driver.clear()
 	driver.fail_next = "connection reset"
-	var failed_load: DotResult = await store.load_progress("ada")
+	var failed_load: GSResult = await store.load_progress("ada")
 	_check(not failed_load.ok, "a read failure fails the load: a blank player would be saved over the real one")
 
 	driver.fail_next = "disk full"
-	var failed_save: DotResult = await store.save_progress("ada", saving)
+	var failed_save: GSResult = await store.save_progress("ada", saving)
 	_check(not failed_save.ok, "a write failure fails the save, so the tracker keeps the progress dirty")
 
-	var newer := DotSqlDriverRecording.new(DotSqlDialect.Kind.SQLITE)
+	var newer := GSSqlDriverRecording.new(GSSqlDialect.Kind.SQLITE)
 	newer.answers = {"SELECT version FROM": [{"version": 99}]}
-	var refused: DotResult = await DotAchievementStoreSql.new(newer).open()
+	var refused: GSResult = await GSAchievementStoreSql.new(newer).open()
 	_check(
 		not refused.ok and newer.matching("CREATE TABLE IF NOT EXISTS dot_achievement_values").is_empty(),
 		"a database from a newer build is refused, and nothing is created in it"
@@ -188,12 +188,12 @@ func _test_sql_failures() -> void:
 	# Two saves of one player in flight at once — an unlock's save, not awaited, and the
 	# autosave. Without serialising them the older snapshot can land second and delete the
 	# unlock the newer one just wrote.
-	var slow := SlowDriver.new(DotSqlDialect.Kind.SQLITE)
+	var slow := SlowDriver.new(GSSqlDialect.Kind.SQLITE)
 	slow.answers = {"SELECT version FROM": []}
-	var slow_store := DotAchievementStoreSql.new(slow)
+	var slow_store := GSAchievementStoreSql.new(slow)
 	await slow_store.open()
 	slow.clear()
-	var racing := DotAchievementProgress.new()
+	var racing := GSAchievementProgress.new()
 	racing.mark_unlocked(&"k10", 1, 5)
 	slow_store.save_progress("ada", racing)    # not awaited, as save_on_unlock does
 	racing.mark_unlocked(&"fast", 2, 10)
@@ -214,8 +214,8 @@ func _test_sql_failures() -> void:
 	)
 
 
-func _sample_progress() -> DotAchievementProgress:
-	var saving := DotAchievementProgress.new()
+func _sample_progress() -> GSAchievementProgress:
+	var saving := GSAchievementProgress.new()
 	saving.set_value(&"kills", 40.0)
 	saving.set_value(&"bad", NAN)
 	saving.mark_unlocked(&"k10", 1700000001, 5)

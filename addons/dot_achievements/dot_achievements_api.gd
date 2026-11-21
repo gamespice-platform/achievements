@@ -1,14 +1,14 @@
 extends RefCounted
 
-## GameSpice Achievements' API level. The rule for bumping it is on [DotAddonApi].
+## GameSpice Achievements' API level. The rule for bumping it is on [GSAddonApi].
 ##
 ## LEVEL rises by one for anything a game could call that did not exist before. OLDEST is
 ## raised to LEVEL when something a game could have called is removed or changes meaning,
 ## because every pack built before that no longer compiles against this addon.
 
 # 1: everything before this file existed (an absent file reads as 1).
-# 2: the points journal: DotPointsReporterConfig.persist_queue, queue_path,
-#    resolved_queue_path(); DotPointsReporter.replayed, journal_error (unsent events
+# 2: the points journal: GSPointsReporterConfig.persist_queue, queue_path,
+#    resolved_queue_path(); GSPointsReporter.replayed, journal_error (unsent events
 #    survive a crash and are resent on the next configure()).
 const LEVEL := 2
 const OLDEST := 1

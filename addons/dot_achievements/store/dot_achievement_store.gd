@@ -1,4 +1,4 @@
-class_name DotAchievementStore
+class_name GSAchievementStore
 extends RefCounted
 
 ## Where a player's progress lives. Subclass point.
@@ -9,19 +9,19 @@ extends RefCounted
 ## would be a store that could only be a file.
 ##
 ## [codeblock]
-## class MyStore extends DotAchievementStore:
-##     func _load_progress(player: String) -> DotResult:
+## class MyStore extends GSAchievementStore:
+##     func _load_progress(player: String) -> GSResult:
 ##         var res := await db.query("select * from achievements where player = $1", player)
 ##         if not res.ok:
 ##             return res
-##         return DotAchievementProgress.from_dictionary(res.value)
+##         return GSAchievementProgress.from_dictionary(res.value)
 ##
-##     func _save_progress(player: String, progress: DotAchievementProgress) -> DotResult:
+##     func _save_progress(player: String, progress: GSAchievementProgress) -> GSResult:
 ##         return await db.upsert(player, progress.to_dictionary())
 ## [/codeblock]
 ##
 ## [b]A load that fails is not an empty player.[/b] Returning a fresh
-## [DotAchievementProgress] when a database is down hands a returning player a blank
+## [GSAchievementProgress] when a database is down hands a returning player a blank
 ## account and then writes it back over the real one. Return the failure; the tracker
 ## refuses to file readings for a player it could not load.
 
@@ -31,18 +31,18 @@ const CHANNEL := "achievements"
 ## Reads one player's progress. Override.
 ##
 ## A player with nothing stored is a success carrying a fresh
-## [DotAchievementProgress], not a failure — a first-time player is the most ordinary
+## [GSAchievementProgress], not a failure — a first-time player is the most ordinary
 ## case there is.
-func _load_progress(_player: String) -> DotResult:
-	return DotResult.fail(
-		DotError.CODE_UNSUPPORTED, "This store cannot read."
+func _load_progress(_player: String) -> GSResult:
+	return GSResult.fail(
+		GSError.CODE_UNSUPPORTED, "This store cannot read."
 	)
 
 
 ## Writes one player's progress. Override.
-func _save_progress(_player: String, _progress: DotAchievementProgress) -> DotResult:
-	return DotResult.fail(
-		DotError.CODE_UNSUPPORTED, "This store cannot write."
+func _save_progress(_player: String, _progress: GSAchievementProgress) -> GSResult:
+	return GSResult.fail(
+		GSError.CODE_UNSUPPORTED, "This store cannot write."
 	)
 
 
@@ -59,11 +59,11 @@ var _saves_failing: bool = false
 ##
 ## ERROR: the tracker refuses to file readings for a player it could not load, so
 ## nothing that player does this session counts toward an achievement.
-func load_progress(player: String) -> DotResult:
-	var res: DotResult = await _load_progress(player)
+func load_progress(player: String) -> GSResult:
+	var res: GSResult = await _load_progress(player)
 
 	if not res.ok:
-		DotLog.error(CHANNEL, "a player's achievement progress could not be read", {
+		GSLog.error(CHANNEL, "a player's achievement progress could not be read", {
 			"store": _store_name(),
 			"player": player.substr(0, 16),
 			"code": res.code(),
@@ -76,8 +76,8 @@ func load_progress(player: String) -> DotResult:
 ## WARN on the first failure, DEBUG while it lasts, INFO when a save lands again:
 ## nothing is lost yet -- the progress stays dirty and is retried -- but a store that
 ## never comes back loses it all at shutdown, and somebody should look.
-func save_progress(player: String, progress: DotAchievementProgress) -> DotResult:
-	var res: DotResult = await _save_progress(player, progress)
+func save_progress(player: String, progress: GSAchievementProgress) -> GSResult:
+	var res: GSResult = await _save_progress(player, progress)
 
 	if not res.ok:
 		var fields := {
@@ -88,14 +88,14 @@ func save_progress(player: String, progress: DotAchievementProgress) -> DotResul
 		}
 
 		if _saves_failing:
-			DotLog.debug(CHANNEL, "achievement progress still not saving", fields)
+			GSLog.debug(CHANNEL, "achievement progress still not saving", fields)
 		else:
-			DotLog.warn(CHANNEL, "achievement progress is not saving; it will be retried", fields)
+			GSLog.warn(CHANNEL, "achievement progress is not saving; it will be retried", fields)
 
 		_saves_failing = true
 	elif _saves_failing:
 		_saves_failing = false
-		DotLog.info(CHANNEL, "achievement progress is saving again", {"store": _store_name()})
+		GSLog.info(CHANNEL, "achievement progress is saving again", {"store": _store_name()})
 
 	return res
 
@@ -103,7 +103,7 @@ func save_progress(player: String, progress: DotAchievementProgress) -> DotResul
 func _store_name() -> String:
 	var script: Script = get_script()
 	var named := script.get_global_name() if script != null else &""
-	return String(named) if named != &"" else "DotAchievementStore"
+	return String(named) if named != &"" else "GSAchievementStore"
 
 
 ## Whether this store can be used at all. Overridden by stores with a connection.

@@ -1,5 +1,5 @@
 @tool
-class_name DotAchievementRule
+class_name GSAchievementRule
 extends Resource
 
 ## One condition over one number: "kills at least 1000", "deaths at most 0".
@@ -14,7 +14,7 @@ extends Resource
 ## agree on is what happens when a new reading meets an old one, and if this addon
 ## answered it differently from the addon that produces the numbers, a lifetime
 ## counter would be silently replaced by a session one. The duplication is on
-## purpose, exactly as [code]DotStatsDef.merge[/code] and the backbone's
+## purpose, exactly as [code]GSStatsDef.merge[/code] and the backbone's
 ## [code]PlayerStatMerge[/code] are the same function written twice — and, as there,
 ## both are tested directly rather than assumed.
 
@@ -57,8 +57,8 @@ static func make(
 	p_value: float,
 	p_op: Op = Op.AT_LEAST,
 	p_merge: Merge = Merge.SUM
-) -> DotAchievementRule:
-	var out := DotAchievementRule.new()
+) -> GSAchievementRule:
+	var out := GSAchievementRule.new()
 	out.stat = p_stat
 	out.value = p_value
 	out.op = p_op
@@ -121,16 +121,16 @@ func has_progress() -> bool:
 	return op == Op.AT_LEAST and absf(value) > EPSILON
 
 
-func validate() -> DotResult:
+func validate() -> GSResult:
 	if String(stat).strip_edges() == "":
-		return DotResult.fail(DotError.CODE_INVALID, "A rule needs a stat to read.")
+		return GSResult.fail(GSError.CODE_INVALID, "A rule needs a stat to read.")
 
 	if is_nan(value) or is_inf(value):
-		return DotResult.fail(
-			DotError.CODE_INVALID, "A rule's threshold must be a number.", String(stat)
+		return GSResult.fail(
+			GSError.CODE_INVALID, "A rule's threshold must be a number.", String(stat)
 		)
 
-	return DotResult.success(self)
+	return GSResult.success(self)
 
 
 func merge_name() -> String:
@@ -158,20 +158,20 @@ func to_dictionary() -> Dictionary:
 	}
 
 
-static func from_dictionary(data: Dictionary) -> DotResult:
+static func from_dictionary(data: Dictionary) -> GSResult:
 	var op_value := op_from_name(str(data.get("op", "at_least")))
 	if op_value < 0:
-		return DotResult.fail(
-			DotError.CODE_PARSE, "Unknown rule operator.", str(data.get("op", ""))
+		return GSResult.fail(
+			GSError.CODE_PARSE, "Unknown rule operator.", str(data.get("op", ""))
 		)
 
 	var merge_value_ := merge_from_name(str(data.get("merge", "sum")))
 	if merge_value_ < 0:
-		return DotResult.fail(
-			DotError.CODE_PARSE, "Unknown merge rule.", str(data.get("merge", ""))
+		return GSResult.fail(
+			GSError.CODE_PARSE, "Unknown merge rule.", str(data.get("merge", ""))
 		)
 
-	var out := DotAchievementRule.new()
+	var out := GSAchievementRule.new()
 	out.stat = StringName(str(data.get("stat", "")))
 	out.op = op_value as Op
 	out.merge = merge_value_ as Merge
@@ -185,4 +185,4 @@ func describe() -> String:
 
 
 func _to_string() -> String:
-	return "DotAchievementRule(%s)" % describe()
+	return "GSAchievementRule(%s)" % describe()

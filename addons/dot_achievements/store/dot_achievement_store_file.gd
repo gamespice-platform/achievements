@@ -1,5 +1,5 @@
-class_name DotAchievementStoreFile
-extends DotAchievementStore
+class_name GSAchievementStoreFile
+extends GSAchievementStore
 
 ## One JSON file per player, under a directory.
 ##
@@ -8,7 +8,7 @@ extends DotAchievementStore
 ##
 ## [b]The filename is derived, never the player key.[/b] A key arrives from a login
 ## and can be anything at all; a store that used it directly is one
-## [code]../../[/code] away from writing outside its directory. [DotPaths.slugify]
+## [code]../../[/code] away from writing outside its directory. [GSPaths.slugify]
 ## plus a hash of the whole key is what makes the name both safe and unique — the
 ## slug alone is not, because two different keys can slugify to the same string, and
 ## GameSpice Timer shipped exactly that: [code]surf_kitsune2[/code] and
@@ -18,12 +18,12 @@ extends DotAchievementStore
 ## Where the files go.
 var directory: String = "user://dot_achievements"
 
-## Written atomically, by [DotSaveStoreFile] (GameSpice Save), which also flushes a browser's IndexedDB. A crash mid-write leaves the old file or the new one and never
+## Written atomically, by [GSSaveStoreFile] (GameSpice Save), which also flushes a browser's IndexedDB. A crash mid-write leaves the old file or the new one and never
 ## half of one — which for a progress file is indistinguishable from a player losing
 ## everything.
 var atomic: bool = true
 
-var _files: DotSaveStoreFile
+var _files: GSSaveStoreFile
 
 
 func _init(p_directory: String = "user://dot_achievements") -> void:
@@ -32,14 +32,14 @@ func _init(p_directory: String = "user://dot_achievements") -> void:
 
 ## The file name, without its folder or ending, a player's progress lives in.
 func key_for(player: String) -> String:
-	var slug := DotPaths.slugify(player, 40)
+	var slug := GSPaths.slugify(player, 40)
 	if slug == "":
 		slug = "player"
 
 	# The hash is what makes it unique; the slug is what makes it readable. Both
 	# matter — an operator looking for one player's file should be able to find it,
 	# and two players must never share one.
-	var digest := DotHash.sha256_text(player).substr(0, 16)
+	var digest := GSHash.sha256_text(player).substr(0, 16)
 
 	return "%s-%s" % [slug, digest]
 
@@ -50,9 +50,9 @@ func path_for(player: String) -> String:
 
 
 ## The file store under this one: the folder, the [code].json[/code] ending, and the atomic switch as they stand now. The key is derived above, so nothing is checked on it.
-func files() -> DotSaveStoreFile:
+func files() -> GSSaveStoreFile:
 	if _files == null:
-		_files = DotSaveStoreFile.new()
+		_files = GSSaveStoreFile.new()
 		_files.suffix = ".json"
 		_files.key_check = func(key: String) -> bool: return not key.is_empty()
 	_files.directory = directory
@@ -60,13 +60,13 @@ func files() -> DotSaveStoreFile:
 	return _files
 
 
-func _load_progress(player: String) -> DotResult:
+func _load_progress(player: String) -> GSResult:
 	var path := path_for(player)
 
 	if not FileAccess.file_exists(path):
-		return DotResult.success(DotAchievementProgress.new())
+		return GSResult.success(GSAchievementProgress.new())
 
-	var read := DotPaths.read_json(path)
+	var read := GSPaths.read_json(path)
 	if not read.ok:
 		# Deliberately a failure and not a fresh player. A file that exists and cannot
 		# be read is a file that must not be overwritten with an empty one, which is
@@ -75,18 +75,18 @@ func _load_progress(player: String) -> DotResult:
 
 	var data: Variant = read.value
 	if typeof(data) != TYPE_DICTIONARY:
-		return DotResult.fail(
-			DotError.CODE_PARSE, "Achievement progress is an object.", path
+		return GSResult.fail(
+			GSError.CODE_PARSE, "Achievement progress is an object.", path
 		)
 
-	return DotAchievementProgress.from_dictionary(data as Dictionary)
+	return GSAchievementProgress.from_dictionary(data as Dictionary)
 
 
-func _save_progress(player: String, progress: DotAchievementProgress) -> DotResult:
+func _save_progress(player: String, progress: GSAchievementProgress) -> GSResult:
 	var written := files().write(key_for(player), JSON.stringify(progress.to_dictionary(), "\t"))
 
 	if not written.ok:
 		return written.wrap("Could not save achievement progress.")
 
 	# The browser's IndexedDB flush is done by the file store.
-	return DotResult.success(1)
+	return GSResult.success(1)

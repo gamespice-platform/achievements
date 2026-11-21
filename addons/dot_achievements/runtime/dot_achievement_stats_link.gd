@@ -1,13 +1,13 @@
-class_name DotAchievementStatsLink
+class_name GSAchievementStatsLink
 extends Node
 
-## Feeds a [DotAchievementTracker] from a GameSpice Stats tracker, without naming one.
+## Feeds a [GSAchievementTracker] from a GameSpice Stats tracker, without naming one.
 ##
 ## [b]This class exists because of one subtlety, and it is the kind that ships.[/b]
 ## GameSpice Stats' [code]recorded[/code] signal carries the player's [i]session[/i] total,
 ## not the reading that caused it — its whole design is that a session is what a
 ## server counts and a delta is what it reports. An achievement is about a lifetime.
-## Wiring the signal straight into [method DotAchievementTracker.record] therefore
+## Wiring the signal straight into [method GSAchievementTracker.record] therefore
 ## adds the running session total to the lifetime total on every single kill: three
 ## after the second kill, six after the third, ten after the fourth.
 ##
@@ -16,27 +16,27 @@ extends Node
 ## player at zero — and the whole value is filed rather than a negative one.
 ##
 ## [codeblock]
-## var link := DotAchievementStatsLink.new()
+## var link := GSAchievementStatsLink.new()
 ## link.tracker = achievements
 ## link.stats = stats_tracker      # anything with a `recorded` signal
 ## add_child(link)
 ## [/codeblock]
 ##
-## Only [constant DotAchievementRule.Merge.SUM] stats are differenced. A highest, a
+## Only [constant GSAchievementRule.Merge.SUM] stats are differenced. A highest, a
 ## lowest or a latest is an absolute value in both systems and is passed through
 ## unchanged — differencing a personal best would be meaningless.
 
-# No log channel: a signal adapter. start() returns a DotResult that every host in the
+# No log channel: a signal adapter. start() returns a GSResult that every host in the
 # family checks, and a reading for a player the tracker does not hold is dropped by
 # design -- the tracker has not loaded them, and filing it would be the bug.
 
 @export var register_as: StringName = &""
 
 ## The achievement tracker to feed.
-var tracker: DotAchievementTracker = null
+var tracker: GSAchievementTracker = null
 
 ## Anything with a [code]recorded(player_id, stat_id, value)[/code] signal.
-## GameSpice Stats' [code]DotStatsTracker[/code], in practice, which is not named here.
+## GameSpice Stats' [code]GSStatsTracker[/code], in practice, which is not named here.
 var stats: Object = null
 
 ## Registry name to find one under when [member stats] is not set.
@@ -55,29 +55,29 @@ func _ready() -> void:
 	start()
 
 
-func start() -> DotResult:
+func start() -> GSResult:
 	if _connected:
-		return DotResult.success(self)
+		return GSResult.success(self)
 
 	if tracker == null:
-		return DotResult.fail(
-			DotError.CODE_STATE, "The link has no achievement tracker."
+		return GSResult.fail(
+			GSError.CODE_STATE, "The link has no achievement tracker."
 		)
 
 	var source := stats
 	if source == null:
-		source = DotRegistry.get_service(stats_service)
+		source = GSRegistry.get_service(stats_service)
 
 	if source == null:
-		return DotResult.fail(
-			DotError.CODE_STATE,
+		return GSResult.fail(
+			GSError.CODE_STATE,
 			"No stats tracker to link to.",
 			String(stats_service)
 		)
 
 	if not source.has_signal("recorded"):
-		return DotResult.fail(
-			DotError.CODE_UNSUPPORTED,
+		return GSResult.fail(
+			GSError.CODE_UNSUPPORTED,
 			"That object has no 'recorded' signal to listen to.",
 			source.get_class()
 		)
@@ -87,13 +87,13 @@ func start() -> DotResult:
 	_connected = true
 
 	if register_as != &"":
-		DotRegistry.register(register_as, self)
+		GSRegistry.register(register_as, self)
 
-	return DotResult.success(self)
+	return GSResult.success(self)
 
 
 ## Forgets a player's session baseline. Call it when they disconnect, alongside
-## [method DotAchievementTracker.end] — otherwise a server that has been up for a
+## [method GSAchievementTracker.end] — otherwise a server that has been up for a
 ## week holds a row per stat per player who ever connected.
 func forget(player: String) -> void:
 	for key in _last_session.keys():
@@ -114,7 +114,7 @@ func _on_recorded(player_id: StringName, stat_id: StringName, value: float) -> v
 	if merge < 0:
 		return
 
-	if merge != int(DotAchievementRule.Merge.SUM):
+	if merge != int(GSAchievementRule.Merge.SUM):
 		tracker.record(player, stat_id, value)
 		return
 
@@ -136,7 +136,7 @@ func _exit_tree() -> void:
 			stats.disconnect("recorded", _on_recorded)
 
 	if register_as != &"":
-		DotRegistry.unregister_instance(register_as, self)
+		GSRegistry.unregister_instance(register_as, self)
 
 
 func describe() -> Dictionary:

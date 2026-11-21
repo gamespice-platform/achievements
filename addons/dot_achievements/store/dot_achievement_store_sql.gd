@@ -1,17 +1,17 @@
-class_name DotAchievementStoreSql
-extends DotAchievementStore
+class_name GSAchievementStoreSql
+extends GSAchievementStore
 
 ## Progress in real tables, in whichever SQL a GameSpice SQL driver speaks.
 ##
 ## [codeblock]
-## var store := DotAchievementStoreSql.new(DotSqlDriverSqlite.new("user://achievements.db"))
+## var store := GSAchievementStoreSql.new(GSSqlDriverSqlite.new("user://achievements.db"))
 ## var opened := await store.open()      # creates or migrates the tables
 ## tracker.store = store
 ## [/codeblock]
 ##
 ## For a community whose servers share one database: a player's progress is the same on
-## all of them, which is what [code]DotAchievementStore[/code]'s "cross-server totals"
-## note means by sharing a store. The tables are [DotAchievementSqlSchema]'s.
+## all of them, which is what [code]GSAchievementStore[/code]'s "cross-server totals"
+## note means by sharing a store. The tables are [GSAchievementSqlSchema]'s.
 ##
 ## [b]The driver is duck-typed[/b] — held untyped and asked for `query`, `batch`,
 ## `upsert_sql`, `dialect` and `migrate` — so GameSpice Achievements does not depend on GameSpice SQL
@@ -39,8 +39,8 @@ signal _released(player: String)
 var driver = null
 
 ## Table names, in case an operator already owns these or runs two games in one database.
-var values_table: String = DotAchievementSqlSchema.DEFAULT_VALUES_TABLE
-var unlocks_table: String = DotAchievementSqlSchema.DEFAULT_UNLOCKS_TABLE
+var values_table: String = GSAchievementSqlSchema.DEFAULT_VALUES_TABLE
+var unlocks_table: String = GSAchievementSqlSchema.DEFAULT_UNLOCKS_TABLE
 
 ## Create or migrate the tables on [method open]. Off for a deployment whose schema is
 ## managed elsewhere and which would rather this touched nothing.
@@ -63,39 +63,39 @@ func is_available() -> bool:
 
 
 ## Opens the driver and, unless told not to, creates or migrates the tables.
-func open() -> DotResult:
+func open() -> GSResult:
 	if driver == null:
-		return DotResult.fail(DotError.CODE_STATE, "No SQL driver.")
+		return GSResult.fail(GSError.CODE_STATE, "No SQL driver.")
 
-	var available: DotResult = driver.is_available()
+	var available: GSResult = driver.is_available()
 	if not available.ok:
 		return available
 
-	var opened: DotResult = await driver.open()
+	var opened: GSResult = await driver.open()
 	if not opened.ok:
 		return opened
 
 	if not create_schema:
-		return DotResult.success(true)
+		return GSResult.success(true)
 
 	# Versioned rather than "create if missing": a database from a NEWER build is refused
 	# rather than read with columns that have changed meaning underneath it — which here
 	# would be a player's lifetime progress, read wrong and then saved back.
-	var migrated: DotResult = await driver.migrate(
-		"%s:%s" % [DotAchievementSqlSchema.MIGRATION_COMPONENT, values_table],
-		DotAchievementSqlSchema.migration_steps(values_table, unlocks_table)
+	var migrated: GSResult = await driver.migrate(
+		"%s:%s" % [GSAchievementSqlSchema.MIGRATION_COMPONENT, values_table],
+		GSAchievementSqlSchema.migration_steps(values_table, unlocks_table)
 	)
 
 	if not migrated.ok:
 		return migrated.wrap("Could not prepare the achievement tables.")
 
-	DotLog.info(CHANNEL, "achievement tables ready", {
-		"dialect": DotAchievementSqlSchema.dialect_name(int(driver.dialect())),
+	GSLog.info(CHANNEL, "achievement tables ready", {
+		"dialect": GSAchievementSqlSchema.dialect_name(int(driver.dialect())),
 		"values": values_table,
 		"unlocks": unlocks_table,
 	})
 
-	return DotResult.success(true)
+	return GSResult.success(true)
 
 
 func close() -> void:
@@ -103,20 +103,20 @@ func close() -> void:
 		driver.close()
 
 
-func _load_progress(player: String) -> DotResult:
+func _load_progress(player: String) -> GSResult:
 	if not is_available():
-		return DotResult.fail(DotError.CODE_STATE, "The database is not open.")
+		return GSResult.fail(GSError.CODE_STATE, "The database is not open.")
 
-	var values: DotResult = await driver.query(
-		DotAchievementSqlSchema.select_values(values_table), [player]
+	var values: GSResult = await driver.query(
+		GSAchievementSqlSchema.select_values(values_table), [player]
 	)
 	# A failure, never a fresh player: a fresh progress handed back while the database is
 	# down is a blank account the next save writes over the real one.
 	if not values.ok:
 		return values.wrap("Could not read a player's achievement values.")
 
-	var unlocks: DotResult = await driver.query(
-		DotAchievementSqlSchema.select_unlocks(unlocks_table), [player]
+	var unlocks: GSResult = await driver.query(
+		GSAchievementSqlSchema.select_unlocks(unlocks_table), [player]
 	)
 	if not unlocks.ok:
 		return unlocks.wrap("Could not read a player's unlocks.")
@@ -126,27 +126,27 @@ func _load_progress(player: String) -> DotResult:
 	# Through the same parser the file store uses. The points total is not stored: the
 	# tracker recounts it from the catalogue on every load, because a stored total is a
 	# cache that a catalogue edit makes wrong.
-	return DotAchievementProgress.from_dictionary(
-		DotAchievementSqlSchema.progress_dictionary(values.value, unlocks.value)
+	return GSAchievementProgress.from_dictionary(
+		GSAchievementSqlSchema.progress_dictionary(values.value, unlocks.value)
 	)
 
 
-func _save_progress(player: String, progress: DotAchievementProgress) -> DotResult:
+func _save_progress(player: String, progress: GSAchievementProgress) -> GSResult:
 	if not is_available():
-		return DotResult.fail(DotError.CODE_STATE, "The database is not open.")
+		return GSResult.fail(GSError.CODE_STATE, "The database is not open.")
 
 	while _saving.has(player):
 		await _released
 
 	_saving[player] = true
-	var res: DotResult = await _write(player, progress)
+	var res: GSResult = await _write(player, progress)
 	_saving.erase(player)
 	_released.emit(player)
 
 	return res
 
 
-func _write(player: String, progress: DotAchievementProgress) -> DotResult:
+func _write(player: String, progress: GSAchievementProgress) -> GSResult:
 	# The snapshot is taken here, after any earlier save of this player finished, so it is
 	# the newest state there is. See the class note.
 	var now := int(Time.get_unix_time_from_system())
@@ -154,7 +154,7 @@ func _write(player: String, progress: DotAchievementProgress) -> DotResult:
 
 	var value_upsert: String = driver.upsert_sql(
 		values_table,
-		PackedStringArray(DotAchievementSqlSchema.VALUE_COLUMNS),
+		PackedStringArray(GSAchievementSqlSchema.VALUE_COLUMNS),
 		PackedStringArray(["player", "stat"])
 	)
 	var kept_stats: Array = []
@@ -163,7 +163,7 @@ func _write(player: String, progress: DotAchievementProgress) -> DotResult:
 		if not is_finite(amount):
 			# JSON cannot carry it and MySQL refuses it; one poisoned number must not cost
 			# the player the rest of the save. Left out, and said so.
-			DotLog.warn(CHANNEL, "skipping a non-finite achievement value", {
+			GSLog.warn(CHANNEL, "skipping a non-finite achievement value", {
 				"player": player.substr(0, 16), "stat": String(stat),
 			})
 			continue
@@ -174,7 +174,7 @@ func _write(player: String, progress: DotAchievementProgress) -> DotResult:
 	# a save carrying a different one (a clock that moved) must not rewrite history.
 	var unlock_insert: String = driver.upsert_sql(
 		unlocks_table,
-		PackedStringArray(DotAchievementSqlSchema.UNLOCK_COLUMNS),
+		PackedStringArray(GSAchievementSqlSchema.UNLOCK_COLUMNS),
 		PackedStringArray(["player", "achievement"]),
 		[]
 	)
@@ -185,20 +185,20 @@ func _write(player: String, progress: DotAchievementProgress) -> DotResult:
 
 	# Deletes last; see the class note.
 	batch.append([
-		DotAchievementSqlSchema.delete_except(unlocks_table, "achievement", kept_unlocks.size()),
+		GSAchievementSqlSchema.delete_except(unlocks_table, "achievement", kept_unlocks.size()),
 		[player] + kept_unlocks,
 	])
 	batch.append([
-		DotAchievementSqlSchema.delete_except(values_table, "stat", kept_stats.size()),
+		GSAchievementSqlSchema.delete_except(values_table, "stat", kept_stats.size()),
 		[player] + kept_stats,
 	])
 
-	var wrote: DotResult = await driver.batch(batch)
+	var wrote: GSResult = await driver.batch(batch)
 	if not wrote.ok:
 		return wrote.wrap("Could not write a player's achievement progress.")
 
 	saves += 1
-	return DotResult.success(batch.size())
+	return GSResult.success(batch.size())
 
 
 func describe() -> Dictionary:
@@ -207,7 +207,7 @@ func describe() -> Dictionary:
 		"available": is_available(),
 		"values_table": values_table,
 		"unlocks_table": unlocks_table,
-		"dialect": DotAchievementSqlSchema.dialect_name(int(driver.dialect()) if driver != null else -1),
+		"dialect": GSAchievementSqlSchema.dialect_name(int(driver.dialect()) if driver != null else -1),
 		"loads": loads,
 		"saves": saves,
 		"saving": _saving.size(),

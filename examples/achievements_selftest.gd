@@ -4,7 +4,7 @@ extends "res://examples/achievements_selftest_rules.gd"
 ##
 ## The stats tracker is faked at the one seam that matters — a
 ## [code]recorded(player, stat, session_value)[/code] signal — because that signal's
-## meaning is the whole reason [DotAchievementStatsLink] exists, and a link written
+## meaning is the whole reason [GSAchievementStatsLink] exists, and a link written
 ## against the wrong meaning parses cleanly and awards a player nine kills for their
 ## fourth.
 ##
@@ -37,45 +37,45 @@ class FakeStats extends Node:
 				sessions[key] = 0.0
 
 
-## A stand-in for GameSpice Auth's DotBackboneClient.
+## A stand-in for GameSpice Auth's GSBackboneClient.
 class FakeBackbone extends RefCounted:
 	var calls: Array[Dictionary] = []
 	var fail: bool = false
 	var retryable: bool = true
 
-	func post_integration(path: String, body: Dictionary) -> DotResult:
+	func post_integration(path: String, body: Dictionary) -> GSResult:
 		calls.append({"path": path, "body": body.duplicate(true)})
 		if fail:
-			var code := DotError.CODE_NETWORK if retryable else DotError.CODE_INVALID
-			return DotResult.fail(code, "the backbone said no")
-		return DotResult.success({"ok": true})
+			var code := GSError.CODE_NETWORK if retryable else GSError.CODE_INVALID
+			return GSResult.fail(code, "the backbone said no")
+		return GSResult.success({"ok": true})
 
-	func get_integration(path: String, query: Dictionary) -> DotResult:
+	func get_integration(path: String, query: Dictionary) -> GSResult:
 		calls.append({"path": path, "query": query.duplicate(true)})
-		return DotResult.success({"player": str(query.get("player", "")), "unlocks": []})
+		return GSResult.success({"player": str(query.get("player", "")), "unlocks": []})
 
 
 ## A store that fails on demand, for the paths that matter most and are never run.
-class FlakyStore extends DotAchievementStore:
-	var inner := DotAchievementStoreMemory.new()
+class FlakyStore extends GSAchievementStore:
+	var inner := GSAchievementStoreMemory.new()
 	var fail_loads: bool = false
 	var fail_saves: bool = false
 	var saves: int = 0
 
-	func _load_progress(player: String) -> DotResult:
+	func _load_progress(player: String) -> GSResult:
 		if fail_loads:
-			return DotResult.fail(DotError.CODE_IO, "the disk is on fire")
+			return GSResult.fail(GSError.CODE_IO, "the disk is on fire")
 		return await inner.load_progress(player)
 
-	func _save_progress(player: String, progress: DotAchievementProgress) -> DotResult:
+	func _save_progress(player: String, progress: GSAchievementProgress) -> GSResult:
 		saves += 1
 		if fail_saves:
-			return DotResult.fail(DotError.CODE_IO, "the disk is still on fire")
+			return GSResult.fail(GSError.CODE_IO, "the disk is still on fire")
 		return await inner.save_progress(player, progress)
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	await _run()
 
 
@@ -124,10 +124,10 @@ func _run() -> void:
 func _test_achievements() -> void:
 	_section("achievements")
 
-	var flawless := DotAchievement.make(&"flawless", "Flawless", [
-		DotAchievementRule.make(&"round_wins", 1.0),
-		DotAchievementRule.make(&"deaths", 0.0, DotAchievementRule.Op.AT_MOST),
-	] as Array[DotAchievementRule])
+	var flawless := GSAchievement.make(&"flawless", "Flawless", [
+		GSAchievementRule.make(&"round_wins", 1.0),
+		GSAchievementRule.make(&"deaths", 0.0, GSAchievementRule.Op.AT_MOST),
+	] as Array[GSAchievementRule])
 
 	_check(flawless.validate().ok, "an achievement with rules validates")
 	_check(
@@ -143,21 +143,21 @@ func _test_achievements() -> void:
 		"a missing stat reads as zero, which an at_most rule is satisfied by"
 	)
 
-	var either := DotAchievement.make(&"either", "Either", [
-		DotAchievementRule.make(&"a", 10.0),
-		DotAchievementRule.make(&"b", 10.0),
-	] as Array[DotAchievementRule])
+	var either := GSAchievement.make(&"either", "Either", [
+		GSAchievementRule.make(&"a", 10.0),
+		GSAchievementRule.make(&"b", 10.0),
+	] as Array[GSAchievementRule])
 	either.require_all = false
 	_check(either.evaluate({&"a": 10.0}), "with require_all off, any one is enough")
 	_check(not either.evaluate({&"a": 9.0, &"b": 9.0}), "and none is not")
 
-	var counter := DotAchievement.counter(&"k100", "Centurion", &"kills", 100.0)
+	var counter := GSAchievement.counter(&"k100", "Centurion", &"kills", 100.0)
 	_check(is_equal_approx(counter.progress({&"kills": 25.0}), 0.25), "progress reports")
 
-	var mixed := DotAchievement.make(&"mixed", "Mixed", [
-		DotAchievementRule.make(&"a", 100.0),
-		DotAchievementRule.make(&"b", 100.0),
-	] as Array[DotAchievementRule])
+	var mixed := GSAchievement.make(&"mixed", "Mixed", [
+		GSAchievementRule.make(&"a", 100.0),
+		GSAchievementRule.make(&"b", 100.0),
+	] as Array[GSAchievementRule])
 	_check(
 		is_equal_approx(mixed.progress({&"a": 100.0, &"b": 0.0}), 0.5),
 		"with require_all, progress is the mean of the requirements"
@@ -168,21 +168,21 @@ func _test_achievements() -> void:
 		"without it, the best single one, because any of them finishing is enough"
 	)
 
-	var empty := DotAchievement.make(&"empty", "Empty", [] as Array[DotAchievementRule])
+	var empty := GSAchievement.make(&"empty", "Empty", [] as Array[GSAchievementRule])
 	_check(
 		not empty.validate().ok,
 		"an achievement with no requirements can never be earned and is refused"
 	)
 	_check(not empty.evaluate({}), "and evaluates to false rather than to true")
 
-	var tiered := DotAchievement.counter(&"t", "Tier", &"kills", 10.0)
+	var tiered := GSAchievement.counter(&"t", "Tier", &"kills", 10.0)
 	tiered.tier = 2
 	_check(
 		not tiered.validate().ok,
 		"a tier with no series to be a tier of is refused"
 	)
 
-	var hidden := DotAchievement.counter(&"h", "Hidden", &"kills", 1.0)
+	var hidden := GSAchievement.counter(&"h", "Hidden", &"kills", 1.0)
 	hidden.hidden = true
 	_check(
 		hidden.to_player_dictionary(false).is_empty(),
@@ -193,7 +193,7 @@ func _test_achievements() -> void:
 		"and is afterwards"
 	)
 
-	var secret := DotAchievement.counter(&"s", "Secret", &"kills", 1.0)
+	var secret := GSAchievement.counter(&"s", "Secret", &"kills", 1.0)
 	secret.secret = true
 	secret.description = "do the thing"
 	var row := secret.to_player_dictionary(false)
@@ -204,10 +204,10 @@ func _test_achievements() -> void:
 		+ "still sent to the client"
 	)
 
-	var back := DotAchievement.from_dictionary(flawless.to_dictionary())
+	var back := GSAchievement.from_dictionary(flawless.to_dictionary())
 	_check(back.ok, "an achievement round-trips")
 	_check(
-		(back.value as DotAchievement).requirements.size() == 2,
+		(back.value as GSAchievement).requirements.size() == 2,
 		"with its rules"
 	)
 
@@ -218,17 +218,17 @@ func _test_tracker() -> void:
 	_section("tracker")
 
 	var tracker := _tracker()
-	var began: DotResult = await tracker.begin("ada")
+	var began: GSResult = await tracker.begin("ada")
 	_check(began.ok, "a player begins")
 
 	var unlocks: Array[String] = []
-	tracker.unlocked.connect(func(player: String, a: DotAchievement) -> void:
+	tracker.unlocked.connect(func(player: String, a: GSAchievement) -> void:
 		# A lambda captures locals by value; append to a captured Array.
 		unlocks.append("%s/%s" % [player, String(a.id)]))
 
 	var bars: Array[float] = []
 	tracker.progressed.connect(
-		func(_p: String, _a: DotAchievement, fraction: float) -> void:
+		func(_p: String, _a: GSAchievement, fraction: float) -> void:
 			bars.append(fraction))
 
 	for i in 9:
@@ -303,7 +303,7 @@ func _test_tracker_refusals() -> void:
 	# the real record.
 	var early := tracker.record("nobody", &"kills", 1.0)
 	_check(
-		not early.ok and early.code() == DotError.CODE_STATE,
+		not early.ok and early.code() == GSError.CODE_STATE,
 		"filing for a player who is not loaded is refused rather than starting them "
 		+ "from zero"
 	)
@@ -318,10 +318,10 @@ func _test_tracker_refusals() -> void:
 	refusing.store = flaky
 
 	var failures: Array[String] = []
-	refusing.load_failed.connect(func(player: String, _e: DotError) -> void:
+	refusing.load_failed.connect(func(player: String, _e: GSError) -> void:
 		failures.append(player))
 
-	var failed: DotResult = await refusing.begin("ada")
+	var failed: GSResult = await refusing.begin("ada")
 	_check(not failed.ok, "a store that cannot read is a failure, not an empty player")
 	_check(failures.size() == 1, "and is announced")
 	_check(
@@ -329,7 +329,7 @@ func _test_tracker_refusals() -> void:
 		"the player is not loaded, so nothing can be filed for them"
 	)
 
-	var without := DotAchievementTracker.new()
+	var without := GSAchievementTracker.new()
 	without.register_as = &""
 	_check(
 		not without.start().ok,
@@ -383,7 +383,7 @@ func _test_stats_link() -> void:
 	var stats := FakeStats.new()
 	add_child(stats)
 
-	var link := DotAchievementStatsLink.new()
+	var link := GSAchievementStatsLink.new()
 	link.tracker = tracker
 	link.stats = stats
 	add_child(link)
@@ -431,12 +431,12 @@ func _test_stats_link() -> void:
 	)
 	link.key_map.erase(&"plat-1")
 
-	var unknown := DotAchievementStatsLink.new()
+	var unknown := GSAchievementStatsLink.new()
 	unknown.tracker = tracker
 	unknown.stats_service = &"nothing_registered"
 	_check(not unknown.start().ok, "a link with nothing to listen to refuses to start")
 
-	var wrong := DotAchievementStatsLink.new()
+	var wrong := GSAchievementStatsLink.new()
 	wrong.tracker = tracker
 	wrong.stats = RefCounted.new()
 	_check(
@@ -455,7 +455,7 @@ func _test_reporter() -> void:
 	_section("reporter")
 
 	var backbone := FakeBackbone.new()
-	var reporter := DotAchievementReporter.with_client(backbone)
+	var reporter := GSAchievementReporter.with_client(backbone)
 
 	_check(reporter.is_available(), "a reporter with a client is available")
 
@@ -463,7 +463,7 @@ func _test_reporter() -> void:
 	# across servers. A report carrying an account uid would undo it from this side.
 	var refused := reporter.queue("backbone:12345", &"k10", 1)
 	_check(
-		not refused.ok and refused.code() == DotError.CODE_INVALID,
+		not refused.ok and refused.code() == GSError.CODE_INVALID,
 		"an account id is refused as a player key before it leaves the process"
 	)
 
@@ -472,7 +472,7 @@ func _test_reporter() -> void:
 	_check(reporter.pending() == 1, "the same unlock twice is queued once")
 
 	reporter.queue("u_bo", &"k10", 101)
-	var flushed: DotResult = await reporter.flush()
+	var flushed: GSResult = await reporter.flush()
 	_check(flushed.ok and int(flushed.value) == 2, "a flush sends everything queued")
 	_check(reporter.pending() == 0, "and empties the queue")
 
@@ -487,7 +487,7 @@ func _test_reporter() -> void:
 	backbone.fail = true
 	backbone.retryable = true
 	reporter.queue("u_cy", &"k10", 102)
-	var failed: DotResult = await reporter.flush()
+	var failed: GSResult = await reporter.flush()
 	_check(not failed.ok, "a failed flush is a failure")
 	_check(
 		reporter.pending() == 1,
@@ -501,9 +501,9 @@ func _test_reporter() -> void:
 		"a refusal drops them instead, rather than resending them for ever"
 	)
 
-	var homeless := DotAchievementReporter.new()
+	var homeless := GSAchievementReporter.new()
 	_check(not homeless.is_available(), "a reporter with no client is not available")
-	var nowhere: DotResult = await homeless.flush()
+	var nowhere: GSResult = await homeless.flush()
 	_check(nowhere.ok, "and flushing an empty queue is not a failure")
 
 
@@ -531,7 +531,7 @@ func _test_tracker_reports() -> void:
 	tracker.report_to_backbone = true
 	tracker.report_interval = 0.05
 	tracker.report_app = "selftest"
-	tracker.reporter = DotAchievementReporter.with_client(backbone)
+	tracker.reporter = GSAchievementReporter.with_client(backbone)
 
 	await tracker.begin("u_ada")
 	# Ten kills earn two: k10, and flawless (five kills, no deaths).
@@ -540,8 +540,8 @@ func _test_tracker_reports() -> void:
 
 	await _wait(0.3)
 
-	var defines := _calls_to(backbone, DotAchievementReporter.DEFINE_PATH)
-	var unlocks := _calls_to(backbone, DotAchievementReporter.UNLOCK_PATH)
+	var defines := _calls_to(backbone, GSAchievementReporter.DEFINE_PATH)
+	var unlocks := _calls_to(backbone, GSAchievementReporter.UNLOCK_PATH)
 	_check(
 		defines.size() == 1
 		and (defines[0]["body"]["achievements"] as Array).size() == tracker.catalogue.size()
@@ -566,11 +566,11 @@ func _test_tracker_reports() -> void:
 	tracker.record("u_ada", &"kills", 90.0)
 	await _wait(0.3)
 	_check(
-		_calls_to(backbone, DotAchievementReporter.DEFINE_PATH).size() == 1,
+		_calls_to(backbone, GSAchievementReporter.DEFINE_PATH).size() == 1,
 		"the catalogue is declared once, not on every send"
 	)
 	_check(
-		_calls_to(backbone, DotAchievementReporter.UNLOCK_PATH).size() == 2
+		_calls_to(backbone, GSAchievementReporter.UNLOCK_PATH).size() == 2
 		and tracker.reporter.sent == 3,
 		"a later unlock goes out on a later tick"
 	)
@@ -583,7 +583,7 @@ func _test_tracker_reports() -> void:
 	var patient := _tracker()
 	patient.report_to_backbone = true
 	patient.report_interval = 0.05
-	patient.reporter = DotAchievementReporter.with_client(down)
+	patient.reporter = GSAchievementReporter.with_client(down)
 
 	await patient.begin("u_bo")
 	patient.unlock("u_bo", &"opening_day")
@@ -596,7 +596,7 @@ func _test_tracker_reports() -> void:
 	down.fail = false
 	await _wait(0.5)
 	_check(
-		_calls_to(down, DotAchievementReporter.DEFINE_PATH).size() >= 2,
+		_calls_to(down, GSAchievementReporter.DEFINE_PATH).size() >= 2,
 		"the declaration is retried once it is back"
 	)
 	_check(
@@ -608,7 +608,7 @@ func _test_tracker_reports() -> void:
 	# Off means off: nothing is queued and nothing is sent.
 	var quiet_backbone := FakeBackbone.new()
 	var quiet := _tracker()
-	quiet.reporter = DotAchievementReporter.with_client(quiet_backbone)
+	quiet.reporter = GSAchievementReporter.with_client(quiet_backbone)
 	quiet.report_interval = 0.05
 	await quiet.begin("u_cy")
 	quiet.record("u_cy", &"kills", 10.0)
@@ -622,7 +622,7 @@ func _test_tracker_reports() -> void:
 	quiet.report_to_backbone = true
 	quiet.report_interval = 600.0
 	quiet.record("u_cy", &"kills", 90.0)
-	var sent: DotResult = await quiet.report()
+	var sent: GSResult = await quiet.report()
 	_check(
 		sent.ok and int(sent.value) == 1 and quiet.reporter.sent == 1,
 		"report() sends what is queued without waiting for the timer"
@@ -644,11 +644,11 @@ func _test_saving() -> void:
 	tracker.record("ada", &"kills", 3.0)
 	_check(tracker.progress_of("ada").dirty, "a reading marks the player dirty")
 
-	var saved: DotResult = await tracker.flush()
+	var saved: GSResult = await tracker.flush()
 	_check(saved.ok and int(saved.value) == 1, "a flush saves the dirty player")
 	_check(not tracker.progress_of("ada").dirty, "and marks them clean")
 
-	var again: DotResult = await tracker.flush()
+	var again: GSResult = await tracker.flush()
 	_check(
 		int(again.value) == 0,
 		"a second flush writes nothing: a server full of idle players is not "
@@ -659,7 +659,7 @@ func _test_saving() -> void:
 	flaky.fail_saves = true
 
 	var save_failures: Array[String] = []
-	tracker.save_failed.connect(func(player: String, _e: DotError) -> void:
+	tracker.save_failed.connect(func(player: String, _e: GSError) -> void:
 		save_failures.append(player))
 
 	await tracker.flush()
@@ -674,9 +674,9 @@ func _test_saving() -> void:
 	await tracker.end("ada")
 	_check(not tracker.has("ada"), "ending a player forgets them")
 
-	var reloaded: DotResult = await flaky.load_progress("ada")
+	var reloaded: GSResult = await flaky.load_progress("ada")
 	_check(
-		is_equal_approx((reloaded.value as DotAchievementProgress).value_of(&"kills"), 4.0),
+		is_equal_approx((reloaded.value as GSAchievementProgress).value_of(&"kills"), 4.0),
 		"and what was saved is what they had"
 	)
 

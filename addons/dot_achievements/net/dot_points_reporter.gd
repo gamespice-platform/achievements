@@ -1,4 +1,4 @@
-class_name DotPointsReporter
+class_name GSPointsReporter
 extends Node
 
 ## Reports a game server's points events to Gamespice, signed with the server's own key.
@@ -22,10 +22,10 @@ extends Node
 ## Every event gets its eventId when it is reported, and each batch is signed once and
 ## resent byte-identical until the site answers, so a retry is never a second payment:
 ## the site deduplicates on (app, server, eventId). Signing goes through GameSpice Cloud's
-## [code]DotCloudSignature.sign[/code] (RSA-SHA256), reached by name so this addon still
+## [code]GSCloudSignature.sign[/code] (RSA-SHA256), reached by name so this addon still
 ## loads without GameSpice Cloud; [member signer] replaces it.
 ##
-## Unsent events survive a crash: with [member DotPointsReporterConfig.persist_queue] on
+## Unsent events survive a crash: with [member GSPointsReporterConfig.persist_queue] on
 ## (the default) every event, sealed batch and answer is appended to a journal file, and
 ## the next [method configure] on the same file queues what was never answered again.
 
@@ -37,20 +37,20 @@ const SCOPE_WRITE := "POINTS_WRITE"
 const EVENTS_PATH := "points/events"
 const VERSION := 1
 const ACCOUNT_PREFIX := "backbone:"
-const SIGNER_CLASS := &"DotCloudSignature"
+const SIGNER_CLASS := &"GSCloudSignature"
 const MAX_COUNT := 2147483647
 const META_KEYS := ["humans", "vsBot"]
 
 ## The backbone client: any object with [code]post_integration(String, Dictionary)[/code],
-## GameSpice Auth's DotBackboneClient in practice. Found under [member client_service] if unset.
+## GameSpice Auth's GSBackboneClient in practice. Found under [member client_service] if unset.
 var client: Object = null
 var client_service: StringName = &"dot_backbone_client"
 
-## [code]func(bytes: PackedByteArray, private_key_pem: String) -> DotResult[/code] whose
-## value is the base64 signature. Empty uses DotCloudSignature.sign.
+## [code]func(bytes: PackedByteArray, private_key_pem: String) -> GSResult[/code] whose
+## value is the base64 signature. Empty uses GSCloudSignature.sign.
 var signer: Callable = Callable()
 
-var config: DotPointsReporterConfig = null
+var config: GSPointsReporterConfig = null
 
 var reported: int = 0
 var accepted: int = 0
@@ -93,46 +93,46 @@ func _init() -> void:
 
 ## Validates [param p_config], reads the key and test-signs with it, so a bad key fails
 ## at boot and not on the first kill. Starts the flush timer when the interval is above 0.
-func configure(p_config: DotPointsReporterConfig) -> DotResult:
+func configure(p_config: GSPointsReporterConfig) -> GSResult:
 	if p_config == null:
-		return DotResult.fail(DotError.CODE_INVALID, "No points reporter config.")
+		return GSResult.fail(GSError.CODE_INVALID, "No points reporter config.")
 	var valid := p_config.validate()
 	if not valid.ok:
-		DotLog.result(CHANNEL, "points reporter not configured", valid, DotLog.Level.ERROR)
+		GSLog.result(CHANNEL, "points reporter not configured", valid, GSLog.Level.ERROR)
 		return valid
 
 	var pem := p_config.private_key_pem
 	if p_config.private_key_path.strip_edges() != "":
 		var f := FileAccess.open(p_config.private_key_path, FileAccess.READ)
 		if f == null:
-			var e := DotResult.fail(
-				DotError.CODE_IO, "Could not read the points signing key.",
+			var e := GSResult.fail(
+				GSError.CODE_IO, "Could not read the points signing key.",
 				"%s: %s" % [p_config.private_key_path, error_string(FileAccess.get_open_error())]
 			)
-			DotLog.result(CHANNEL, "points reporter not configured", e, DotLog.Level.ERROR)
+			GSLog.result(CHANNEL, "points reporter not configured", e, GSLog.Level.ERROR)
 			return e
 		pem = f.get_as_text()
 
 	var probe := _sign("probe".to_utf8_buffer(), pem)
 	if not probe.ok:
-		DotLog.result(CHANNEL, "the points signing key cannot sign", probe, DotLog.Level.ERROR)
+		GSLog.result(CHANNEL, "the points signing key cannot sign", probe, GSLog.Level.ERROR)
 		return probe.wrap("The points signing key cannot sign.")
 
 	config = p_config
 	_key_pem = pem
-	_journal_path = "" if DotPlatform.is_web() else config.resolved_queue_path()
+	_journal_path = "" if GSPlatform.is_web() else config.resolved_queue_path()
 	if _journal_path != "" and _journal_loaded != _journal_path:
 		_journal_loaded = _journal_path
 		_replay_journal()
 	_restart_timer()
-	DotLog.info(CHANNEL, "points reporter configured", {
+	GSLog.info(CHANNEL, "points reporter configured", {
 		"app": config.app_id, "server": config.server_id,
 		"flush_interval_secs": config.flush_interval_secs,
 		"max_batch_events": config.max_batch_events,
 		"max_pending_events": config.max_pending_events,
 		"queue_path": _journal_path, "replayed": replayed,
 	})
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 func is_configured() -> bool:
@@ -162,7 +162,7 @@ func _on_timer() -> void:
 
 ## Whether this process may report: a server, never a web build or a client.
 func is_server_side() -> bool:
-	if DotPlatform.is_web():
+	if GSPlatform.is_web():
 		return false
 	if is_inside_tree() and multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
 		return false
@@ -183,29 +183,29 @@ static func is_player_key(candidate: String) -> bool:
 func report(
 	player: String, event_key: String, count: int = 1, meta: Dictionary = {},
 	event_id: String = "", at: int = 0
-) -> DotResult:
+) -> GSResult:
 	if not is_server_side():
-		return _refuse(DotError.CODE_FORBIDDEN, "Points events are reported by the server only.", "")
+		return _refuse(GSError.CODE_FORBIDDEN, "Points events are reported by the server only.", "")
 	if not is_configured():
-		return _refuse(DotError.CODE_STATE, "The points reporter is not configured.", "")
+		return _refuse(GSError.CODE_STATE, "The points reporter is not configured.", "")
 	if not is_player_key(player):
-		return _refuse(DotError.CODE_INVALID, "A player must be a scoped player key.", player.substr(0, 16))
+		return _refuse(GSError.CODE_INVALID, "A player must be a scoped player key.", player.substr(0, 16))
 	if _key_re.search(event_key) == null:
-		return _refuse(DotError.CODE_INVALID, "An event key is 1-64 of a-z 0-9 _ . : -.", event_key.substr(0, 64))
+		return _refuse(GSError.CODE_INVALID, "An event key is 1-64 of a-z 0-9 _ . : -.", event_key.substr(0, 64))
 	if count < 1 or count > MAX_COUNT:
-		return _refuse(DotError.CODE_INVALID, "count must be 1 to %d." % MAX_COUNT, str(count))
+		return _refuse(GSError.CODE_INVALID, "count must be 1 to %d." % MAX_COUNT, str(count))
 	var clean_meta := {}
 	for k in meta:
 		var name := str(k)
 		if not META_KEYS.has(name):
-			return _refuse(DotError.CODE_INVALID, "Unknown meta key; only humans and vsBot are sent.", name)
+			return _refuse(GSError.CODE_INVALID, "Unknown meta key; only humans and vsBot are sent.", name)
 	if meta.has("humans"):
 		if typeof(meta["humans"]) != TYPE_INT or int(meta["humans"]) < 0:
-			return _refuse(DotError.CODE_INVALID, "meta.humans must be an int of 0 or more.", str(meta["humans"]))
+			return _refuse(GSError.CODE_INVALID, "meta.humans must be an int of 0 or more.", str(meta["humans"]))
 		clean_meta["humans"] = int(meta["humans"])
 	if meta.has("vsBot"):
 		if typeof(meta["vsBot"]) != TYPE_BOOL:
-			return _refuse(DotError.CODE_INVALID, "meta.vsBot must be a bool.", str(meta["vsBot"]))
+			return _refuse(GSError.CODE_INVALID, "meta.vsBot must be a bool.", str(meta["vsBot"]))
 		clean_meta["vsBot"] = bool(meta["vsBot"])
 
 	var id := event_id
@@ -213,21 +213,21 @@ func report(
 		_seq += 1
 		id = "%s:%d" % [_boot_id, _seq]
 	if _id_re.search(id) == null:
-		return _refuse(DotError.CODE_INVALID, "An eventId is 1-128 of A-Z a-z 0-9 _ . : -.", id.substr(0, 128))
+		return _refuse(GSError.CODE_INVALID, "An eventId is 1-128 of A-Z a-z 0-9 _ . : -.", id.substr(0, 128))
 
 	var when := at if at != 0 else int(Time.get_unix_time_from_system())
 	if when <= 0:
-		return _refuse(DotError.CODE_INVALID, "at must be a positive unix time.", str(when))
+		return _refuse(GSError.CODE_INVALID, "at must be a positive unix time.", str(when))
 
 	if config.max_pending_events > 0 and pending() >= config.max_pending_events:
 		# Loud, not lossy: the caller learns the event was not taken.
 		if not _warned_full:
 			_warned_full = true
-			DotLog.error(CHANNEL, "points events are being refused: max_pending_events reached", {
+			GSLog.error(CHANNEL, "points events are being refused: max_pending_events reached", {
 				"max_pending_events": config.max_pending_events, "last_error": last_error,
 			})
-		return DotResult.fail(
-			DotError.CODE_STATE, "Too many points events are waiting to be sent.",
+		return GSResult.fail(
+			GSError.CODE_STATE, "Too many points events are waiting to be sent.",
 			"max_pending_events=%d" % config.max_pending_events
 		)
 
@@ -239,32 +239,32 @@ func report(
 	_queue.append(ev)
 	reported += 1
 	_journal_append({"e": ev})
-	return DotResult.success(id)
+	return GSResult.success(id)
 
 
-func _refuse(code: String, message: String, detail: String) -> DotResult:
-	var res := DotResult.fail(code, message, detail)
-	DotLog.result(CHANNEL, "points event refused", res, DotLog.Level.WARN)
+func _refuse(code: String, message: String, detail: String) -> GSResult:
+	var res := GSResult.fail(code, message, detail)
+	GSLog.result(CHANNEL, "points event refused", res, GSLog.Level.WARN)
 	return res
 
 
 ## Signs what is queued into batches and sends every batch waiting, oldest first.
 ## The value is the number of events the site answered for.
-func flush() -> DotResult:
+func flush() -> GSResult:
 	if _flushing:
-		return DotResult.success(0)
+		return GSResult.success(0)
 	if _queue.is_empty() and _outbox.is_empty():
-		return DotResult.success(0)
+		return GSResult.success(0)
 	if not is_configured():
-		return DotResult.fail(DotError.CODE_STATE, "The points reporter is not configured.")
+		return GSResult.fail(GSError.CODE_STATE, "The points reporter is not configured.")
 	var backbone := _client()
 	if backbone == null:
 		if not _warned_no_client:
 			_warned_no_client = true
-			DotLog.warn(CHANNEL, "points events are waiting and there is no backbone client", {
+			GSLog.warn(CHANNEL, "points events are waiting and there is no backbone client", {
 				"service": String(client_service), "pending": pending(),
 			})
-		return DotResult.fail(DotError.CODE_STATE, "No backbone client is available.")
+		return GSResult.fail(GSError.CODE_STATE, "No backbone client is available.")
 
 	_flushing = true
 	var sealed := _seal()
@@ -275,7 +275,7 @@ func flush() -> DotResult:
 	var answered := 0
 	while not _outbox.is_empty():
 		var entry: Dictionary = _outbox[0]
-		var res: DotResult = await backbone.call(
+		var res: GSResult = await backbone.call(
 			"post_integration", EVENTS_PATH, {"batch": entry["batch"], "sig": entry["sig"]}
 		)
 		if not res.ok:
@@ -283,7 +283,7 @@ func flush() -> DotResult:
 			last_error = str(res.error)
 			if _should_retry(res.error):
 				if not _failing:
-					DotLog.warn(CHANNEL, "points reporting is failing; the signed batch will be resent", {
+					GSLog.warn(CHANNEL, "points reporting is failing; the signed batch will be resent", {
 						"pending": pending(), "error": last_error,
 					})
 				_failing = true
@@ -292,7 +292,7 @@ func flush() -> DotResult:
 				var ids: PackedStringArray = entry["ids"]
 				_journal_append({"d": Array(ids)})
 				dropped += ids.size()
-				DotLog.error(CHANNEL, "the site refused a points batch; it was dropped", {
+				GSLog.error(CHANNEL, "the site refused a points batch; it was dropped", {
 					"dropped": ids.size(), "error": last_error, "scope": SCOPE_WRITE,
 				})
 				batch_dropped.emit(ids, last_error)
@@ -310,16 +310,16 @@ func flush() -> DotResult:
 
 	if _failing:
 		_failing = false
-		DotLog.info(CHANNEL, "points reporting recovered", {"answered": answered})
+		GSLog.info(CHANNEL, "points reporting recovered", {"answered": answered})
 	_warned_full = false
 	_warned_no_client = false
 	_flushing = false
 	if pending() == 0:
 		_journal_rewrite()
-	return DotResult.success(answered)
+	return GSResult.success(answered)
 
 
-func _seal() -> DotResult:
+func _seal() -> GSResult:
 	while not _queue.is_empty():
 		var take := _queue.size()
 		if config.max_batch_events > 0:
@@ -333,7 +333,7 @@ func _seal() -> DotResult:
 		var sig := _sign(text.to_utf8_buffer(), _key_pem)
 		if not sig.ok:
 			last_error = str(sig.error)
-			DotLog.result(CHANNEL, "could not sign a points batch; events stay queued", sig, DotLog.Level.ERROR)
+			GSLog.result(CHANNEL, "could not sign a points batch; events stay queued", sig, GSLog.Level.ERROR)
 			return sig.wrap("Could not sign points events.")
 		var ids := PackedStringArray()
 		for ev in events:
@@ -342,12 +342,12 @@ func _seal() -> DotResult:
 		_journal_append({"b": {"batch": text, "sig": str(sig.value), "ids": Array(ids)}})
 		for i in take:
 			_queue.pop_front()
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 # Resending the same bytes only helps when the site never judged them: a network fault,
 # a 5xx or a 429. Any other 4xx (bad_batch, 413, 401, 403) would fail the same forever.
-func _should_retry(error: DotError) -> bool:
+func _should_retry(error: GSError) -> bool:
 	if error == null or not error.is_retryable():
 		return false
 	var status := error.http_status
@@ -369,12 +369,12 @@ func _tally(results: Array) -> void:
 				# Once per code: a bot match refused every round is policy, not news.
 				if not _refusal_codes_seen.has(code):
 					_refusal_codes_seen[code] = true
-					DotLog.warn(CHANNEL, "the site refused points events", {
+					GSLog.warn(CHANNEL, "the site refused points events", {
 						"code": code, "detail": str(r.get("detail", "")),
 					})
 
 
-func _sign(bytes: PackedByteArray, pem: String) -> DotResult:
+func _sign(bytes: PackedByteArray, pem: String) -> GSResult:
 	if signer.is_valid():
 		return signer.call(bytes, pem)
 	var path := ""
@@ -383,9 +383,9 @@ func _sign(bytes: PackedByteArray, pem: String) -> DotResult:
 			path = str(entry.get("path", ""))
 			break
 	if path == "":
-		return DotResult.fail(
-			DotError.CODE_UNSUPPORTED,
-			"No signer: install dot-cloud (DotCloudSignature) or set signer."
+		return GSResult.fail(
+			GSError.CODE_UNSUPPORTED,
+			"No signer: install dot-cloud (GSCloudSignature) or set signer."
 		)
 	var script: Script = load(path)
 	return script.call("sign", bytes, pem)
@@ -450,7 +450,7 @@ func _journal_failed(why: String) -> void:
 	# Loud once per outage: events are still held in memory and sent, but a crash now
 	# would lose them.
 	if journal_error == "":
-		DotLog.error(CHANNEL, "cannot write the points journal; unsent events would not survive a crash", {
+		GSLog.error(CHANNEL, "cannot write the points journal; unsent events would not survive a crash", {
 			"queue_path": _journal_path, "error": why,
 		})
 	journal_error = why
@@ -458,7 +458,7 @@ func _journal_failed(why: String) -> void:
 
 func _journal_ok() -> void:
 	if journal_error != "":
-		DotLog.info(CHANNEL, "the points journal is being written again", {"queue_path": _journal_path})
+		GSLog.info(CHANNEL, "the points journal is being written again", {"queue_path": _journal_path})
 	journal_error = ""
 
 
@@ -529,11 +529,11 @@ func _replay_journal() -> void:
 	old_queue.append_array(_queue)
 	_queue = old_queue
 	if torn > 0:
-		DotLog.warn(CHANNEL, "skipped unreadable lines in the points journal", {
+		GSLog.warn(CHANNEL, "skipped unreadable lines in the points journal", {
 			"queue_path": _journal_path, "lines": torn,
 		})
 	if replayed > 0:
-		DotLog.info(CHANNEL, "resending points events an earlier run did not get answered", {
+		GSLog.info(CHANNEL, "resending points events an earlier run did not get answered", {
 			"queue_path": _journal_path, "events": replayed, "batches": old_batches,
 		})
 	_journal_rewrite()
@@ -553,7 +553,7 @@ static func _event_from_json(raw: Dictionary) -> Dictionary:
 func _client() -> Object:
 	if client != null and is_instance_valid(client):
 		return client
-	var found := DotRegistry.get_service(client_service)
+	var found := GSRegistry.get_service(client_service)
 	if found != null and found.has_method("post_integration"):
 		return found
 	return null

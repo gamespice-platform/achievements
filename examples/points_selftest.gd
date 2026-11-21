@@ -1,6 +1,6 @@
 extends "res://examples/achievements_selftest_sql.gd"
 
-## Exercises DotPointsReporter against a fake backbone and a real dot-cloud signature.
+## Exercises GSPointsReporter against a fake backbone and a real dot-cloud signature.
 ## Extends the SQL section's file only for its check harness.
 ##
 ## [codeblock]
@@ -12,21 +12,21 @@ const CHECKS := 58
 const JOURNAL := "user://points_selftest/queue.jsonl"
 
 
-## A stand-in for GameSpice Auth's DotBackboneClient. [member fail_with] fails the next posts.
+## A stand-in for GameSpice Auth's GSBackboneClient. [member fail_with] fails the next posts.
 class FakeBackbone extends RefCounted:
 	var calls: Array[Dictionary] = []
-	var fail_with: DotError = null
+	var fail_with: GSError = null
 
-	func post_integration(path: String, body: Dictionary) -> DotResult:
+	func post_integration(path: String, body: Dictionary) -> GSResult:
 		calls.append({"path": path, "body": body.duplicate(true)})
 		if fail_with != null:
-			return DotResult.failure(fail_with)
+			return GSResult.failure(fail_with)
 		var parsed: Variant = JSON.parse_string(str(body.get("batch", "")))
 		var results: Array = []
 		if parsed is Dictionary:
 			for ev in (parsed as Dictionary).get("events", []):
 				results.append({"eventId": ev["eventId"], "status": "accepted", "amount": 5})
-		return DotResult.success({"ok": true, "results": results})
+		return GSResult.success({"ok": true, "results": results})
 
 
 var _public_pem: String = ""
@@ -34,14 +34,14 @@ var _private_pem: String = ""
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	await _run()
 
 
 func _run() -> void:
 	_line("dot-achievements points reporter self-test")
 
-	var pair := DotCloudSignature.generate_keypair(2048)
+	var pair := GSCloudSignature.generate_keypair(2048)
 	if not pair.ok:
 		_line("ERROR: could not generate a keypair: %s" % str(pair.error))
 		get_tree().quit(1)
@@ -69,8 +69,8 @@ func _run() -> void:
 	get_tree().quit(1 if _failed > 0 else 0)
 
 
-func _config(batch: int = 100, pending_cap: int = 0, interval: float = 0.0) -> DotPointsReporterConfig:
-	var c := DotPointsReporterConfig.new()
+func _config(batch: int = 100, pending_cap: int = 0, interval: float = 0.0) -> GSPointsReporterConfig:
+	var c := GSPointsReporterConfig.new()
 	c.app_id = 7
 	c.server_id = 42
 	c.private_key_pem = _private_pem
@@ -81,9 +81,9 @@ func _config(batch: int = 100, pending_cap: int = 0, interval: float = 0.0) -> D
 	return c
 
 
-func _reporter(c: DotPointsReporterConfig) -> Array:
+func _reporter(c: GSPointsReporterConfig) -> Array:
 	var backbone := FakeBackbone.new()
-	var r := DotPointsReporter.new()
+	var r := GSPointsReporter.new()
 	r.client = backbone
 	add_child(r)
 	var res := r.configure(c)
@@ -93,7 +93,7 @@ func _reporter(c: DotPointsReporterConfig) -> Array:
 func _test_config() -> void:
 	_section("config: required values, 0 = unlimited, bad values fail rather than clamp")
 
-	_check(not DotPointsReporterConfig.new().validate().ok, "a default config is refused: no app, server or key")
+	_check(not GSPointsReporterConfig.new().validate().ok, "a default config is refused: no app, server or key")
 	_check(_config().validate().ok, "app, server and a key is enough")
 	_check(_config(0, 0, 0.0).validate().ok, "0 batch, 0 pending and 0 interval are valid (unlimited, no timer)")
 	_check(not _config(-1).validate().ok, "a negative max_batch_events fails")
@@ -113,8 +113,8 @@ func _test_configure() -> void:
 	var bad := _config()
 	bad.private_key_pem = "-----BEGIN PRIVATE KEY-----\nnope\n-----END PRIVATE KEY-----\n"
 	var made := _reporter(bad)
-	var r: DotPointsReporter = made[0]
-	_check(not (made[2] as DotResult).ok, "a PEM that is not a key is refused")
+	var r: GSPointsReporter = made[0]
+	_check(not (made[2] as GSResult).ok, "a PEM that is not a key is refused")
 	_check(not r.is_configured(), "and the reporter stays unconfigured")
 	_check(not r.report("u_ada", "kill").ok, "so report() fails instead of queueing")
 	r.queue_free()
@@ -123,19 +123,19 @@ func _test_configure() -> void:
 	missing.private_key_pem = ""
 	missing.private_key_path = "user://no-such-points-key.pem"
 	made = _reporter(missing)
-	_check((made[2] as DotResult).code() == DotError.CODE_IO, "a key file that is not there is an io failure")
-	(made[0] as DotPointsReporter).queue_free()
+	_check((made[2] as GSResult).code() == GSError.CODE_IO, "a key file that is not there is an io failure")
+	(made[0] as GSPointsReporter).queue_free()
 
 	made = _reporter(_config())
-	_check((made[2] as DotResult).ok, "a real RSA key configures")
-	(made[0] as DotPointsReporter).queue_free()
+	_check((made[2] as GSResult).ok, "a real RSA key configures")
+	(made[0] as GSPointsReporter).queue_free()
 
 
 func _test_report_refusals() -> void:
 	_section("report: the strict event shape, refused before it leaves the process")
 
 	var made := _reporter(_config())
-	var r: DotPointsReporter = made[0]
+	var r: GSPointsReporter = made[0]
 	_check(not r.report("backbone:12345", "kill").ok, "an account id is not a player key")
 	_check(not r.report("u ada", "kill").ok, "a player key with a space is refused")
 	_check(not r.report("u_ada", "Kill").ok, "an event key with capitals is refused")
@@ -156,7 +156,7 @@ func _test_signed_batches() -> void:
 	_section("flush: signed batches the site can verify, with no amount anywhere")
 
 	var made := _reporter(_config(2))
-	var r: DotPointsReporter = made[0]
+	var r: GSPointsReporter = made[0]
 	var backbone: FakeBackbone = made[1]
 	var settled: Array = []
 	r.events_settled.connect(func(results: Array) -> void: settled.append_array(results))
@@ -164,14 +164,14 @@ func _test_signed_batches() -> void:
 	r.report("u_ada", "kill", 1, {"humans": 6, "vsBot": false})
 	r.report("u_bo", "headshot", 3)
 	r.report("u_cy", "match_win")
-	var flushed: DotResult = await r.flush()
+	var flushed: GSResult = await r.flush()
 	_check(flushed.ok and int(flushed.value) == 3, "a flush sends every event")
 	_check(backbone.calls.size() == 2, "in batches of max_batch_events (2 + 1)")
 	_check(str(backbone.calls[0]["path"]) == "points/events", "to points/events")
 
 	var body: Dictionary = backbone.calls[0]["body"]
 	var text := str(body["batch"])
-	var verified := DotCloudSignature.verify(text.to_utf8_buffer(), str(body["sig"]), _public_pem)
+	var verified := GSCloudSignature.verify(text.to_utf8_buffer(), str(body["sig"]), _public_pem)
 	_check(verified.ok, "the sig verifies over the batch bytes with the public key")
 	_check(body.keys().size() == 2, "the body is only batch and sig")
 	var batch: Dictionary = JSON.parse_string(text)
@@ -194,11 +194,11 @@ func _test_retry() -> void:
 	_section("retry: the same signed bytes until answered; a refusal is dropped")
 
 	var made := _reporter(_config())
-	var r: DotPointsReporter = made[0]
+	var r: GSPointsReporter = made[0]
 	var backbone: FakeBackbone = made[1]
 	r.report("u_ada", "kill")
-	backbone.fail_with = DotError.from_http(503)
-	var failed: DotResult = await r.flush()
+	backbone.fail_with = GSError.from_http(503)
+	var failed: GSResult = await r.flush()
 	_check(not failed.ok and r.pending() == 1, "a 503 keeps the event")
 	r.report("u_bo", "kill")
 	backbone.fail_with = null
@@ -212,7 +212,7 @@ func _test_retry() -> void:
 	var dropped_ids: Array = []
 	r.batch_dropped.connect(func(ids: PackedStringArray, _e: String) -> void: dropped_ids.append_array(ids))
 	r.report("u_cy", "kill")
-	backbone.fail_with = DotError.from_http(400, "bad_batch")
+	backbone.fail_with = GSError.from_http(400, "bad_batch")
 	await r.flush()
 	_check(r.pending() == 0 and r.dropped == 1 and dropped_ids.size() == 1, "a 400 is dropped and signalled, not resent for ever")
 	r.queue_free()
@@ -222,7 +222,7 @@ func _test_limits() -> void:
 	_section("limits: 0 is unlimited; a full queue refuses loudly and drops nothing")
 
 	var made := _reporter(_config(0))
-	var r: DotPointsReporter = made[0]
+	var r: GSPointsReporter = made[0]
 	var backbone: FakeBackbone = made[1]
 	for i in 5:
 		r.report("u_%d" % i, "kill")
@@ -234,15 +234,15 @@ func _test_limits() -> void:
 	r = made[0]
 	_check(r.report("u_a", "kill").ok and r.report("u_b", "kill").ok, "up to max_pending_events is taken")
 	var full := r.report("u_c", "kill")
-	_check(not full.ok and full.code() == DotError.CODE_STATE, "past it report() fails")
+	_check(not full.ok and full.code() == GSError.CODE_STATE, "past it report() fails")
 	_check(r.pending() == 2 and r.dropped == 0, "and nothing already held is dropped")
 
 	var used := []
-	r.signer = func(bytes: PackedByteArray, _pem: String) -> DotResult:
+	r.signer = func(bytes: PackedByteArray, _pem: String) -> GSResult:
 		used.append(bytes.size())
-		return DotResult.success("c2ln")
+		return GSResult.success("c2ln")
 	await r.flush()
-	_check(used.size() == 1, "an injected signer replaces DotCloudSignature")
+	_check(used.size() == 1, "an injected signer replaces GSCloudSignature")
 	_check(r.report("u_c", "kill").ok, "and once sent, there is room again")
 	r.queue_free()
 
@@ -251,7 +251,7 @@ func _test_timer() -> void:
 	_section("timer: flush_interval_secs flushes without the game calling flush()")
 
 	var made := _reporter(_config(100, 0, 0.2))
-	var r: DotPointsReporter = made[0]
+	var r: GSPointsReporter = made[0]
 	var backbone: FakeBackbone = made[1]
 	r.report("u_ada", "kill")
 	await get_tree().create_timer(0.6).timeout
@@ -264,8 +264,8 @@ func _test_journal() -> void:
 	_section("journal: unsent events survive a crash and are resent once")
 
 	var c := _config(2)
-	_check(c.persist_queue == false and DotPointsReporterConfig.new().persist_queue, "persisting is the default (off here for the other sections)")
-	var plain := DotPointsReporterConfig.new()
+	_check(c.persist_queue == false and GSPointsReporterConfig.new().persist_queue, "persisting is the default (off here for the other sections)")
+	var plain := GSPointsReporterConfig.new()
 	plain.app_id = 7
 	plain.server_id = 42
 	_check(plain.resolved_queue_path().contains("queue-7-42"), "the default journal is per app and server")
@@ -274,12 +274,12 @@ func _test_journal() -> void:
 	c.persist_queue = true
 	c.queue_path = JOURNAL
 	var made := _reporter(c)
-	var r: DotPointsReporter = made[0]
+	var r: GSPointsReporter = made[0]
 	var backbone: FakeBackbone = made[1]
 	r.report("u_ada", "kill", 1, {"humans": 4})
 	r.report("u_bo", "kill", 2)
 	r.report("u_cy", "kill")
-	backbone.fail_with = DotError.from_http(503)
+	backbone.fail_with = GSError.from_http(503)
 	await r.flush()
 	var first_try: Dictionary = backbone.calls[0]["body"]
 	r.report("u_di", "kill")
@@ -291,7 +291,7 @@ func _test_journal() -> void:
 	r = made[0]
 	backbone = made[1]
 	_check(r.replayed == 4 and r.pending() == 4, "a new reporter on the same file queues them again")
-	var sent: DotResult = await r.flush()
+	var sent: GSResult = await r.flush()
 	_check(sent.ok and backbone.calls.size() == 3, "and sends them: two sealed batches, then the one left queued")
 	var again: Dictionary = backbone.calls[0]["body"]
 	_check(again["batch"] == first_try["batch"] and again["sig"] == first_try["sig"], "a sealed batch is resent byte-identical")

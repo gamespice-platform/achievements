@@ -1,4 +1,4 @@
-class_name DotAchievementReporter
+class_name GSAchievementReporter
 extends RefCounted
 
 ## Sends unlocks to the TMC backbone, in batches, through a client it never names.
@@ -12,7 +12,7 @@ extends RefCounted
 ##
 ## [codeblock]
 ## POST /api/integration/v1/achievements/define        (ACHIEVEMENTS_WRITE)
-##   { "app": "<id>", "achievements": [ <DotAchievement.to_dictionary()>, ... ] }
+##   { "app": "<id>", "achievements": [ <GSAchievement.to_dictionary()>, ... ] }
 ##   -> { "ok": true, "created": n, "updated": n, "unchanged": n, "refused"?: [...] }
 ##
 ## POST /api/integration/v1/achievements/unlock        (ACHIEVEMENTS_WRITE)
@@ -57,7 +57,7 @@ const ACCOUNT_PREFIX := "backbone:"
 
 ## The backbone client. Any object with
 ## [code]post_integration(String, Dictionary)[/code] — GameSpice Auth's
-## [code]DotBackboneClient[/code] in practice, which is not named here.
+## [code]GSBackboneClient[/code] in practice, which is not named here.
 var client: Object = null
 
 ## Registry name to find one under when [member client] is not set.
@@ -88,8 +88,8 @@ var _warned_no_client: bool = false
 var _warned_account_key: bool = false
 
 
-static func with_client(p_client: Object) -> DotAchievementReporter:
-	var out := DotAchievementReporter.new()
+static func with_client(p_client: Object) -> GSAchievementReporter:
+	var out := GSAchievementReporter.new()
 	out.client = p_client
 	return out
 
@@ -98,7 +98,7 @@ func _client() -> Object:
 	if client != null and is_instance_valid(client):
 		return client
 
-	var found := DotRegistry.get_service(client_service)
+	var found := GSRegistry.get_service(client_service)
 	if found != null and found.has_method("post_integration"):
 		return found
 
@@ -119,18 +119,18 @@ static func is_player_key(candidate: String) -> bool:
 
 
 ## Adds one unlock to the queue. Never blocks and never fails a game.
-func queue(player: String, id: StringName, at: int) -> DotResult:
+func queue(player: String, id: StringName, at: int) -> GSResult:
 	if not is_player_key(player):
 		# Once per reporter: the tracker drops this result, and a game passing account
 		# ids is a game none of whose unlocks will ever be reported. WARN, because it is
 		# an integration mistake somebody has to fix, and it will not fix itself.
 		if not _warned_account_key:
 			_warned_account_key = true
-			DotLog.warn(CHANNEL, "refusing a player key that is not a pseudonym; unlocks for such keys are not reported", {
+			GSLog.warn(CHANNEL, "refusing a player key that is not a pseudonym; unlocks for such keys are not reported", {
 				"key": player.substr(0, 16),
 			})
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"A player key must be a pseudonymous scoped key, not an account id.",
 			player.substr(0, 16)
 		)
@@ -140,7 +140,7 @@ func queue(player: String, id: StringName, at: int) -> DotResult:
 	# thing that notices.
 	for held in _queue:
 		if str(held["player"]) == player and str(held["key"]) == String(id):
-			return DotResult.success(0)
+			return GSResult.success(0)
 
 	_queue.append({
 		"player": player,
@@ -156,50 +156,50 @@ func queue(player: String, id: StringName, at: int) -> DotResult:
 		# either an outage outlasting the queue or nothing calling flush() at all.
 		if not _warned_overflow:
 			_warned_overflow = true
-			DotLog.warn(CHANNEL, "the unlock queue is full; the oldest are being dropped", {
+			GSLog.warn(CHANNEL, "the unlock queue is full; the oldest are being dropped", {
 				"limit": queue_limit, "sent": sent, "failures": failures,
 			})
 
-	return DotResult.success(_queue.size())
+	return GSResult.success(_queue.size())
 
 
 ## Declares the catalogue, so a site can show an achievement nobody has earned yet.
-func define(catalogue: DotAchievementCatalogue, app: String = "") -> DotResult:
+func define(catalogue: GSAchievementCatalogue, app: String = "") -> GSResult:
 	var backbone := _client()
 	if backbone == null:
-		return DotResult.fail(
-			DotError.CODE_STATE, "No backbone client is available."
+		return GSResult.fail(
+			GSError.CODE_STATE, "No backbone client is available."
 		)
 
 	var body := {"achievements": (catalogue.to_dictionary())["achievements"]}
 	if app != "":
 		body["app"] = app
 
-	var res: DotResult = await backbone.call("post_integration", DEFINE_PATH, body)
+	var res: GSResult = await backbone.call("post_integration", DEFINE_PATH, body)
 	if res.ok:
 		_defined = true
 	else:
 		# WARN: unlocks still report without it; what is lost is a site showing the
 		# achievements nobody has earned yet.
-		DotLog.result(CHANNEL, "the achievement catalogue was not declared", res, DotLog.Level.WARN)
+		GSLog.result(CHANNEL, "the achievement catalogue was not declared", res, GSLog.Level.WARN)
 
 	return res
 
 
 ## Sends everything queued, in batches.
-func flush() -> DotResult:
+func flush() -> GSResult:
 	if _queue.is_empty():
-		return DotResult.success(0)
+		return GSResult.success(0)
 
 	var backbone := _client()
 	if backbone == null:
 		if not _warned_no_client:
 			_warned_no_client = true
-			DotLog.warn(CHANNEL, "unlocks are queued and there is no backbone client to send them", {
+			GSLog.warn(CHANNEL, "unlocks are queued and there is no backbone client to send them", {
 				"service": String(client_service), "pending": _queue.size(),
 			})
-		return DotResult.fail(
-			DotError.CODE_STATE, "No backbone client is available."
+		return GSResult.fail(
+			GSError.CODE_STATE, "No backbone client is available."
 		)
 
 	var total := 0
@@ -209,7 +209,7 @@ func flush() -> DotResult:
 		while not _queue.is_empty() and batch.size() < batch_limit:
 			batch.append(_queue.pop_front())
 
-		var res: DotResult = await backbone.call(
+		var res: GSResult = await backbone.call(
 			"post_integration", UNLOCK_PATH, {"unlocks": batch}
 		)
 
@@ -228,11 +228,11 @@ func flush() -> DotResult:
 				# Retryable: nothing is lost yet, so the outage is reported on its
 				# edges -- WARN when it starts, DEBUG while every flush repeats it.
 				if _failing:
-					DotLog.debug(CHANNEL, "unlock reporting still failing", {
+					GSLog.debug(CHANNEL, "unlock reporting still failing", {
 						"pending": _queue.size(), "error": last_error,
 					})
 				else:
-					DotLog.warn(CHANNEL, "unlock reporting is failing; the batch will be retried", {
+					GSLog.warn(CHANNEL, "unlock reporting is failing; the batch will be retried", {
 						"pending": _queue.size(), "error": last_error,
 					})
 				_failing = true
@@ -240,7 +240,7 @@ func flush() -> DotResult:
 				dropped += batch.size()
 				# ERROR every time: these unlocks are gone, and a refusal the backbone
 				# will not retry is usually a contract or a scope the operator can fix.
-				DotLog.error(CHANNEL, "the backbone refused unlocks; the batch was dropped", {
+				GSLog.error(CHANNEL, "the backbone refused unlocks; the batch was dropped", {
 					"dropped": batch.size(), "error": last_error, "scope": SCOPE_WRITE,
 				})
 
@@ -251,7 +251,7 @@ func flush() -> DotResult:
 		# catalogue does not hold) and applies the rest. Those unlocks are gone, and
 		# without this line nothing on this side would ever say so.
 		if res.value is Dictionary and (res.value as Dictionary).get("refused") is Array:
-			DotLog.error(CHANNEL, "the backbone refused some unlocks; declare the catalogue first", {
+			GSLog.error(CHANNEL, "the backbone refused some unlocks; declare the catalogue first", {
 				"refused": (res.value as Dictionary)["refused"], "defined": _defined,
 			})
 
@@ -260,31 +260,31 @@ func flush() -> DotResult:
 
 	if _failing:
 		_failing = false
-		DotLog.info(CHANNEL, "unlock reporting recovered", {"sent": total})
+		GSLog.info(CHANNEL, "unlock reporting recovered", {"sent": total})
 
 	_warned_overflow = false
 	_warned_no_client = false
 
-	return DotResult.success(total)
+	return GSResult.success(total)
 
 
 ## Reads a player's unlocks back from the backbone.
-func fetch_player(player: String) -> DotResult:
+func fetch_player(player: String) -> GSResult:
 	var backbone := _client()
 	if backbone == null:
-		return DotResult.fail(DotError.CODE_STATE, "No backbone client is available.")
+		return GSResult.fail(GSError.CODE_STATE, "No backbone client is available.")
 
 	if not backbone.has_method("get_integration"):
-		return DotResult.fail(
-			DotError.CODE_UNSUPPORTED, "That client cannot make integration reads."
+		return GSResult.fail(
+			GSError.CODE_UNSUPPORTED, "That client cannot make integration reads."
 		)
 
 	if not is_player_key(player):
-		return DotResult.fail(
-			DotError.CODE_INVALID, "That is not a player key."
+		return GSResult.fail(
+			GSError.CODE_INVALID, "That is not a player key."
 		)
 
-	var res: DotResult = await backbone.call(
+	var res: GSResult = await backbone.call(
 		"get_integration", PLAYER_PATH, {"player": player}
 	)
 	return res

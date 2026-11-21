@@ -1,5 +1,5 @@
 @tool
-class_name DotAchievementCatalogue
+class_name GSAchievementCatalogue
 extends Resource
 
 ## Everything a game can award, declared once.
@@ -16,18 +16,18 @@ extends Resource
 ## second — so the catalogue builds [code]stat -> achievements[/code] once and the
 ## tracker evaluates only what the stat touches.
 
-# No log channel: a document. Parsing and validation return a DotResult, and the tracker
+# No log channel: a document. Parsing and validation return a GSResult, and the tracker
 # that loads it at start wraps and returns the failure to its host.
 
-@export var achievements: Array[DotAchievement] = []
+@export var achievements: Array[GSAchievement] = []
 
 var _by_id: Dictionary = {}
 var _by_stat: Dictionary = {}
 var _indexed: bool = false
 
 
-static func of(entries: Array[DotAchievement]) -> DotAchievementCatalogue:
-	var out := DotAchievementCatalogue.new()
+static func of(entries: Array[GSAchievement]) -> GSAchievementCatalogue:
+	var out := GSAchievementCatalogue.new()
 	out.achievements = entries
 	return out
 
@@ -37,7 +37,7 @@ static func of(entries: Array[DotAchievement]) -> DotAchievementCatalogue:
 ## [b]Call it at boot and branch on it.[/b] A duplicate id is not a cosmetic problem:
 ## the store is keyed by id, so two achievements sharing one means earning either
 ## marks both, for ever, in every save file written from then on.
-func validate() -> DotResult:
+func validate() -> GSResult:
 	_by_id.clear()
 	_by_stat.clear()
 
@@ -45,8 +45,8 @@ func validate() -> DotResult:
 
 	for achievement in achievements:
 		if achievement == null:
-			return DotResult.fail(
-				DotError.CODE_INVALID, "The catalogue has an empty entry."
+			return GSResult.fail(
+				GSError.CODE_INVALID, "The catalogue has an empty entry."
 			)
 
 		var valid := achievement.validate()
@@ -54,8 +54,8 @@ func validate() -> DotResult:
 			return valid
 
 		if _by_id.has(achievement.id):
-			return DotResult.fail(
-				DotError.CODE_INVALID,
+			return GSResult.fail(
+				GSError.CODE_INVALID,
 				"Two achievements share an id.",
 				String(achievement.id)
 			)
@@ -65,8 +65,8 @@ func validate() -> DotResult:
 		if achievement.series != &"":
 			var key := "%s#%d" % [String(achievement.series), achievement.tier]
 			if series_tiers.has(key):
-				return DotResult.fail(
-					DotError.CODE_INVALID,
+				return GSResult.fail(
+					GSError.CODE_INVALID,
 					"Two achievements share a series and a tier.",
 					key
 				)
@@ -74,7 +74,7 @@ func validate() -> DotResult:
 
 		for stat in achievement.watched_stats():
 			if not _by_stat.has(stat):
-				var fresh: Array[DotAchievement] = []
+				var fresh: Array[GSAchievement] = []
 				_by_stat[stat] = fresh
 			(_by_stat[stat] as Array).append(achievement)
 
@@ -90,19 +90,19 @@ func validate() -> DotResult:
 			if rule == null:
 				continue
 			if merges.has(rule.stat) and int(merges[rule.stat]) != int(rule.merge):
-				return DotResult.fail(
-					DotError.CODE_INVALID,
+				return GSResult.fail(
+					GSError.CODE_INVALID,
 					"One stat is read with two different merge rules.",
 					"%s: %s and %s" % [
 						String(rule.stat),
-						DotAchievementRule.MERGE_NAMES[int(merges[rule.stat])],
+						GSAchievementRule.MERGE_NAMES[int(merges[rule.stat])],
 						rule.merge_name(),
 					]
 				)
 			merges[rule.stat] = int(rule.merge)
 
 	_indexed = true
-	return DotResult.success(achievements.size())
+	return GSResult.success(achievements.size())
 
 
 func _ensure_indexed() -> void:
@@ -110,7 +110,7 @@ func _ensure_indexed() -> void:
 		validate()
 
 
-func find(id: StringName) -> DotAchievement:
+func find(id: StringName) -> GSAchievement:
 	_ensure_indexed()
 	if _by_id.has(id):
 		return _by_id[id]
@@ -127,11 +127,11 @@ func size() -> int:
 
 
 ## The achievements a reading of [param stat] could have moved.
-func affected_by(stat: StringName) -> Array[DotAchievement]:
+func affected_by(stat: StringName) -> Array[GSAchievement]:
 	_ensure_indexed()
 	if _by_stat.has(stat):
 		return _by_stat[stat]
-	var empty: Array[DotAchievement] = []
+	var empty: Array[GSAchievement] = []
 	return empty
 
 
@@ -172,21 +172,21 @@ func merge_for(stat: StringName) -> int:
 	return found
 
 
-func by_category(category: StringName) -> Array[DotAchievement]:
-	var out: Array[DotAchievement] = []
+func by_category(category: StringName) -> Array[GSAchievement]:
+	var out: Array[GSAchievement] = []
 	for achievement in achievements:
 		if achievement != null and achievement.category == category:
 			out.append(achievement)
 	return out
 
 
-func in_series(series: StringName) -> Array[DotAchievement]:
-	var out: Array[DotAchievement] = []
+func in_series(series: StringName) -> Array[GSAchievement]:
+	var out: Array[GSAchievement] = []
 	for achievement in achievements:
 		if achievement != null and achievement.series == series:
 			out.append(achievement)
 
-	out.sort_custom(func(a: DotAchievement, b: DotAchievement) -> bool:
+	out.sort_custom(func(a: GSAchievement, b: GSAchievement) -> bool:
 		return a.tier < b.tier)
 
 	return out
@@ -231,19 +231,19 @@ func to_site_defs(game: int = 0) -> Dictionary:
 	return out
 
 
-static func from_dictionary(data: Dictionary) -> DotResult:
+static func from_dictionary(data: Dictionary) -> GSResult:
 	var rows: Variant = data.get("achievements")
 	if typeof(rows) != TYPE_ARRAY:
-		return DotResult.fail(
-			DotError.CODE_PARSE, "A catalogue needs an achievements array."
+		return GSResult.fail(
+			GSError.CODE_PARSE, "A catalogue needs an achievements array."
 		)
 
-	var out := DotAchievementCatalogue.new()
+	var out := GSAchievementCatalogue.new()
 
 	for entry in (rows as Array):
 		if typeof(entry) != TYPE_DICTIONARY:
 			continue
-		var parsed := DotAchievement.from_dictionary(entry as Dictionary)
+		var parsed := GSAchievement.from_dictionary(entry as Dictionary)
 		if not parsed.ok:
 			return parsed
 		out.achievements.append(parsed.value)
@@ -252,25 +252,25 @@ static func from_dictionary(data: Dictionary) -> DotResult:
 	if not valid.ok:
 		return valid
 
-	return DotResult.success(out)
+	return GSResult.success(out)
 
 
-static func from_json_file(path: String) -> DotResult:
-	var read := DotPaths.read_json(path)
+static func from_json_file(path: String) -> GSResult:
+	var read := GSPaths.read_json(path)
 	if not read.ok:
 		return read.wrap("Could not read the achievement catalogue.")
 
 	var data: Variant = read.value
 	if typeof(data) != TYPE_DICTIONARY:
-		return DotResult.fail(
-			DotError.CODE_PARSE, "An achievement catalogue is an object.", path
+		return GSResult.fail(
+			GSError.CODE_PARSE, "An achievement catalogue is an object.", path
 		)
 
 	return from_dictionary(data as Dictionary)
 
 
-func save_json_file(path: String) -> DotResult:
-	return DotPaths.write_json(path, to_dictionary())
+func save_json_file(path: String) -> GSResult:
+	return GSPaths.write_json(path, to_dictionary())
 
 
 func describe_lines() -> PackedStringArray:

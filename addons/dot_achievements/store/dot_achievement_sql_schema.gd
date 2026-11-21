@@ -1,5 +1,5 @@
 @tool
-class_name DotAchievementSqlSchema
+class_name GSAchievementSqlSchema
 extends RefCounted
 
 ## The two achievement tables, their statements and their row mapping, in one place.
@@ -97,7 +97,7 @@ static func delete_except(table: String, column: String, count: int) -> String:
 	return "DELETE FROM %s WHERE player = ? AND %s NOT IN (%s)" % [table, column, ", ".join(marks)]
 
 
-## Two row sets back into the dictionary [method DotAchievementProgress.from_dictionary]
+## Two row sets back into the dictionary [method GSAchievementProgress.from_dictionary]
 ## reads, so the SQL store and the file store go through one parser.
 ##
 ## Numbers may arrive as floats (the gateway speaks JSON) or as text (some drivers return a
