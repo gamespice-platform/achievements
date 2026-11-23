@@ -198,10 +198,10 @@ func _test_sql_failures() -> void:
 	slow_store.save_progress("ada", racing)    # not awaited, as save_on_unlock does
 	racing.mark_unlocked(&"fast", 2, 10)
 	await slow_store.save_progress("ada", racing)
-	var order: Array = slow.statements.map(func(st): return str(st["sql"]).left(34))
+	var order: Array = slow.statements.map(func(st): return str(st["sql"]).get_slice(" (", 0).get_slice(" WHERE", 0))
 	var serial := [
-		"INSERT INTO gs_achievement_unlock", "DELETE FROM gs_achievement_unlock", "DELETE FROM gs_achievement_values",
-		"INSERT INTO gs_achievement_unlock", "INSERT INTO gs_achievement_unlock", "DELETE FROM gs_achievement_unlock", "DELETE FROM gs_achievement_values",
+		"INSERT INTO gs_achievement_unlocks", "DELETE FROM gs_achievement_unlocks", "DELETE FROM gs_achievement_values",
+		"INSERT INTO gs_achievement_unlocks", "INSERT INTO gs_achievement_unlocks", "DELETE FROM gs_achievement_unlocks", "DELETE FROM gs_achievement_values",
 	]
 	_check(
 		order == serial,

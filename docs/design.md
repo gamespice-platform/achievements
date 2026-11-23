@@ -92,6 +92,20 @@ POST /api/integration/v1/points/events      (POINTS_WRITE)
 
 **Signing is GameSpice Cloud's.** The batch is signed with `GSCloudSignature.sign` (RSA PKCS#1 v1.5 over SHA-256, base64), found by class name at run time, so this addon still loads without GameSpice Cloud; a host can set `signer` instead. Godot has no Ed25519, so the key the owner registers must be RSA, at least 2048 bits, with alg `RSA_SHA256`. `configure()` test-signs at boot, so a bad key fails there and not on the first kill.
 
+**Wire contract** (website-city docs/app-points.md). The reporter signs the batch text byte for byte and resends it unchanged until the site answers, so a retry is never a second payment:
+
+```
+POST /api/integration/v1/points/events                (POINTS_WRITE)
+  { "batch": "<JSON text, signed byte for byte>", "sig": "<base64>" }
+  batch = { "v": 1, "app": <id>, "server": <id>,
+            "events": [ { "eventId", "eventKey", "player", "at",
+                          "count"?, "meta"?: { "humans"?, "vsBot"? } }, ... ] }
+  -> { "ok": true, "accepted": n, "duplicate": n, "refused": n,
+       "results": [ { "eventId", "status", "amount"?, "ledgerId"?, "code"? }, ... ] }
+```
+
+The owner sets the amounts on the site, so no event carries one and `report()` refuses a meta key it does not know. Signing goes through GameSpice Cloud's `GSCloudSignature.sign` (RSA-SHA256), reached by name so this addon still loads without GameSpice Cloud; `signer` replaces it.
+
 **Server only.** `report()` refuses on a web build and on a multiplayer client. Clients never report and never send amounts.
 
 **No silent limits.** `max_batch_events` and `max_pending_events` are 0 for unlimited; negative values fail `validate()`. A full queue makes `report()` fail with `CODE_STATE` and an ERROR log, and nothing already held is dropped. Keep `max_batch_events` at or under the site's `appPoints.maxEventsPerBatch`.

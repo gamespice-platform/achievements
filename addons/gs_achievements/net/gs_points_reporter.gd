@@ -2,32 +2,8 @@ class_name GSPointsReporter
 extends Node
 
 ## Reports a game server's points events to Gamespice, signed with the server's own key.
-##
-## The site's contract (website-city docs/app-points.md):
-##
-## [codeblock]
-## POST /api/integration/v1/points/events                (POINTS_WRITE)
-##   { "batch": "<JSON text, signed byte for byte>", "sig": "<base64>" }
-##   batch = { "v": 1, "app": <id>, "server": <id>,
-##             "events": [ { "eventId", "eventKey", "player", "at",
-##                           "count"?, "meta"?: { "humans"?, "vsBot"? } }, ... ] }
-##   -> { "ok": true, "accepted": n, "duplicate": n, "refused": n,
-##        "results": [ { "eventId", "status", "amount"?, "ledgerId"?, "code"? }, ... ] }
-## [/codeblock]
-##
-## [b]A game says what happened, never what it is worth.[/b] The owner sets the amounts
-## on the site, so nothing here carries one, and [method report] refuses a meta key it
-## does not know rather than passing an "amount" along.
-##
-## Every event gets its eventId when it is reported, and each batch is signed once and
-## resent byte-identical until the site answers, so a retry is never a second payment:
-## the site deduplicates on (app, server, eventId). Signing goes through GameSpice Cloud's
-## [code]GSCloudSignature.sign[/code] (RSA-SHA256), reached by name so this addon still
-## loads without GameSpice Cloud; [member signer] replaces it.
-##
-## Unsent events survive a crash: with [member GSPointsReporterConfig.persist_queue] on
-## (the default) every event, sealed batch and answer is appended to a journal file, and
-## the next [method configure] on the same file queues what was never answered again.
+## A game says what happened, never what it is worth; each batch is signed once and resent
+## byte-identical until answered. The wire contract and the journal are in docs/design.md.
 
 signal events_settled(results: Array)
 signal batch_dropped(event_ids: PackedStringArray, error: String)
@@ -175,11 +151,9 @@ static func is_player_key(candidate: String) -> bool:
 	return RegEx.create_from_string("^[A-Za-z0-9._:-]{1,64}$").search(candidate) != null
 
 
-## Queues one event. [param player] is the player's scoped key, never an account id.
-## [param meta] takes only [code]humans[/code] (int) and [code]vsBot[/code] (bool).
-## [param event_id] defaults to a new unique id; pass your own (e.g. match:round:seq) to
-## make reporting the same moment twice harmless. [param at] defaults to now (unix s).
-## The value is the eventId.
+## Queues one event and returns its eventId. [param player] is the player's scoped key.
+## [param meta] takes only [code]humans[/code] and [code]vsBot[/code]. [param event_id] defaults
+## to a new id; pass your own to make reporting one moment twice harmless. [param at] is unix s.
 func report(
 	player: String, event_key: String, count: int = 1, meta: Dictionary = {},
 	event_id: String = "", at: int = 0

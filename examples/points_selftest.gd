@@ -2,10 +2,7 @@ extends "res://examples/achievements_selftest_sql.gd"
 
 ## Exercises GSPointsReporter against a fake backbone and a real gs-cloud signature.
 ## Extends the SQL section's file only for its check harness.
-##
-## [codeblock]
-## godot --headless --path . res://examples/points_selftest.tscn
-## [/codeblock]
+## Run: godot --headless --path . res://examples/points_selftest.tscn
 
 const SECTIONS := 8
 const CHECKS := 58
