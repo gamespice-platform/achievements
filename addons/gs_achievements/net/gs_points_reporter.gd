@@ -16,6 +16,8 @@ const ACCOUNT_PREFIX := "backbone:"
 const SIGNER_CLASS := &"GSCloudSignature"
 const MAX_COUNT := 2147483647
 const META_KEYS := ["humans", "vsBot"]
+## gs-core's level whose GSPaths.write_bytes writes through a per-writer temporary.
+const ATOMIC_CORE_LEVEL := 49
 
 ## The backbone client: any object with [code]post_integration(String, Dictionary)[/code],
 ## GameSpice Auth's GSBackboneClient in practice. Found under [member client_service] if unset.
@@ -400,18 +402,40 @@ func _journal_rewrite() -> void:
 				return
 		_journal_ok()
 		return
+	var lines := PackedStringArray()
+	for entry in _outbox:
+		lines.append(JSON.stringify({"b": {
+			"batch": entry["batch"], "sig": entry["sig"], "ids": Array(entry["ids"] as PackedStringArray),
+		}}))
+	for ev in _queue:
+		lines.append(JSON.stringify({"e": ev}))
+	var text := "\n".join(lines) + "\n"
+	if core_writes_atomically():
+		var written := GSPaths.write_text(_journal_path, text)
+		if not written.ok:
+			_journal_failed(written.error.message if written.error != null else "write failed")
+			return
+		_journal_ok()
+		return
+	_journal_write_shared_tmp(text)
+
+
+## Whether this build's GSPaths.write_bytes gives every writer its own temporary (gs-core API 49).
+## Two reporters on one journal (two servers sharing a queue_path) shared a fixed
+## [code]<path>.tmp[/code]: one truncated it under the other's rename, and a replay read half a file.
+static func core_writes_atomically() -> bool:
+	return GSAddonApi.build_level("gs_core") >= ATOMIC_CORE_LEVEL
+
+
+# The rewrite before gs-core API 49: a fixed temporary, so two writers at once can tear it.
+func _journal_write_shared_tmp(text: String) -> void:
 	DirAccess.make_dir_recursive_absolute(_journal_path.get_base_dir())
 	var tmp := _journal_path + ".tmp"
 	var f := FileAccess.open(tmp, FileAccess.WRITE)
 	if f == null:
 		_journal_failed(error_string(FileAccess.get_open_error()))
 		return
-	for entry in _outbox:
-		f.store_line(JSON.stringify({"b": {
-			"batch": entry["batch"], "sig": entry["sig"], "ids": Array(entry["ids"] as PackedStringArray),
-		}}))
-	for ev in _queue:
-		f.store_line(JSON.stringify({"e": ev}))
+	f.store_string(text)
 	f.close()
 	var moved := DirAccess.rename_absolute(tmp, _journal_path)
 	if moved != OK:

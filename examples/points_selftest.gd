@@ -4,8 +4,8 @@ extends "res://examples/achievements_selftest_sql.gd"
 ## Extends the SQL section's file only for its check harness.
 ## Run: godot --headless --path . res://examples/points_selftest.tscn
 
-const SECTIONS := 8
-const CHECKS := 58
+const SECTIONS := 9
+const CHECKS := 65
 const JOURNAL := "user://points_selftest/queue.jsonl"
 
 
@@ -54,6 +54,7 @@ func _run() -> void:
 	await _test_limits()
 	await _test_timer()
 	await _test_journal()
+	_test_journal_writes_are_whole()
 
 	_line("")
 	_line("%d sections, %d passed, %d failed" % [_section_count, _passed, _failed])
@@ -311,3 +312,62 @@ func _test_journal() -> void:
 	r.report("u_fy", "kill")
 	_check(r.describe()["queue_path"] == "" and not FileAccess.file_exists(JOURNAL), "persist_queue off writes nothing")
 	r.queue_free()
+
+
+func _test_journal_writes_are_whole() -> void:
+	_section("journal: whole to a reader while four reporters rewrite one file")
+
+	const DIR := "user://points_selftest_atomic"
+	const WRITERS := 4
+	const ROUNDS := 30
+	const EVENTS := 200
+	var path := DIR + "/queue.jsonl"
+	GSPaths.remove_tree(DIR)
+	_check(GSPointsReporter.core_writes_atomically(), "gs-core here is API 49 or later, so the journal writes through GSPaths")
+
+	# Bare reporters, never configured or in the tree: only their journal state is used.
+	var writers: Array[GSPointsReporter] = []
+	for w in WRITERS:
+		var r := GSPointsReporter.new()
+		r._journal_path = path
+		for i in EVENTS:
+			r._queue.append({"eventId": "w%d:%d" % [w, i], "eventKey": "kill", "player": "u_%d" % i, "at": 1700000000})
+		writers.append(r)
+	writers[0]._journal_rewrite()
+	_check(writers[0].journal_error == "" and FileAccess.file_exists(path), "a first rewrite lands")
+
+	var writer := func(w: int) -> void:
+		for _r in ROUNDS:
+			writers[w]._journal_rewrite()
+	var group := WorkerThreadPool.add_group_task(writer, WRITERS)
+	var reads := 0
+	var torn := 0
+	while not WorkerThreadPool.is_group_task_completed(group):
+		reads += 1
+		var lines := FileAccess.get_file_as_string(path).strip_edges().split("\n")
+		if lines.size() != EVENTS or not (JSON.parse_string(lines[EVENTS - 1]) is Dictionary):
+			torn += 1
+	WorkerThreadPool.wait_for_group_task_completion(group)
+
+	var errors := writers.filter(func(r: GSPointsReporter) -> bool: return r.journal_error != "")
+	_check(errors.is_empty(), "every one of %d rewrites succeeded (%d reporters failed)" % [WRITERS * ROUNDS, errors.size()])
+	_check(reads > 0 and torn == 0, "%d reads during the rewrites, none missing or torn (%d were)" % [reads, torn])
+	var left := Array(DirAccess.get_files_at(DIR)).filter(func(f: String) -> bool: return f.ends_with(".tmp"))
+	_check(left.is_empty(), "no temporary is left beside the journal: %s" % [left])
+
+	var c := _config()
+	c.persist_queue = true
+	c.queue_path = path
+	var made := _reporter(c)
+	_check((made[0] as GSPointsReporter).replayed == EVENTS, "a configured reporter replays every event the last writer left")
+	(made[0] as GSPointsReporter).free()
+
+	# The pre-49 path still writes a whole journal for a build with an older gs-core.
+	DirAccess.remove_absolute(path)
+	writers[0]._journal_write_shared_tmp("{\"e\": {\"eventId\": \"m1:1\"}}\n")
+	var back := FileAccess.get_file_as_string(path)
+	_check(writers[0].journal_error == "" and back.begins_with("{\"e\"") and not FileAccess.file_exists(path + ".tmp"),
+			"the fallback for gs-core before 49 still writes and renames")
+	for r in writers:
+		r.free()
+	GSPaths.remove_tree(DIR)
