@@ -13,7 +13,7 @@ extends "res://examples/achievements_selftest_rules.gd"
 ## [/codeblock]
 
 const SECTIONS := 14
-const CHECKS := 180
+const CHECKS := 183
 
 
 ## A stand-in for GameSpice Stats' tracker, which this addon never names.

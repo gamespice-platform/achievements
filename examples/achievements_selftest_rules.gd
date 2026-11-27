@@ -269,6 +269,27 @@ func _test_stores() -> void:
 		+ "a blank one on the next save"
 	)
 
+	await _test_torn_file(file, progress)
+
+
+## A torn write: the file exists and is empty. Nothing in it to keep, so it is set aside and
+## the player loads fresh, instead of failing every load after (gs-core before API 49 left these).
+func _test_torn_file(file: GSAchievementStoreFile, progress: GSAchievementProgress) -> void:
+	var torn_path := file.path_for("torn")
+	GSPaths.write_text(torn_path, "")
+	var torn: GSResult = await file.load_progress("torn")
+	_check(
+		torn.ok and (torn.value as GSAchievementProgress).unlocked_count() == 0,
+		"an empty progress file (a torn write) loads as a fresh player"
+	)
+	_check(
+		not FileAccess.file_exists(torn_path) and FileAccess.file_exists(torn_path + file.files().aside_suffix),
+		"and is set aside, not deleted"
+	)
+	await file.save_progress("torn", progress)
+	var retorn: GSResult = await file.load_progress("torn")
+	_check(retorn.ok and (retorn.value as GSAchievementProgress).is_unlocked(&"k100"), "and the next save lands where it was")
+
 
 func _catalogue() -> GSAchievementCatalogue:
 	var k10 := GSAchievement.counter(&"k10", "First Blood", &"kills", 10.0)

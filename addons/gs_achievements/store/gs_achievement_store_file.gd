@@ -66,6 +66,17 @@ func _load_progress(player: String) -> GSResult:
 	if not FileAccess.file_exists(path):
 		return GSResult.success(GSAchievementProgress.new())
 
+	# Empty is a torn write (gs-core before API 49), never a save: nothing to lose, so it is
+	# set aside and the player starts fresh instead of every later load failing on it.
+	var probe := FileAccess.open(path, FileAccess.READ)
+	var empty := probe != null and probe.get_length() == 0
+	if probe != null:
+		probe.close()
+	if empty:
+		var aside := files().set_aside(key_for(player))
+		if aside.ok:
+			return GSResult.success(GSAchievementProgress.new())
+
 	var read := GSPaths.read_json(path)
 	if not read.ok:
 		# Deliberately a failure and not a fresh player. A file that exists and cannot
